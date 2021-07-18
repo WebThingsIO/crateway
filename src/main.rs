@@ -1,18 +1,30 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#![feature(proc_macro_hygiene, decl_macro)]
+
+#[macro_use]
+extern crate rocket;
+#[macro_use]
+extern crate lazy_static;
 
 mod addon_instance;
 mod addon_socket;
+mod db;
+mod model;
 mod process_manager;
+mod rest_api;
+mod router;
+mod user_config;
 
 use crate::process_manager::{ProcessManager, StartAddon};
 use actix::prelude::*;
-use dirs::home_dir;
 use log::{info, LevelFilter};
 use simplelog::{ColorChoice, ConfigBuilder, TermLogger, TerminalMode};
 
-#[actix_web::main]
+#[rocket::main]
 async fn main() {
     TermLogger::init(
         LevelFilter::Debug,
@@ -30,20 +42,27 @@ async fn main() {
 
     info!("Starting gateway");
 
-    let mut home_dir = home_dir().expect("Get home dir");
+    tokio::spawn(async {
+        let system = System::new();
 
-    home_dir.push(".webthings2");
+        actix::spawn(async {
+            let mut addon_dir = user_config::ADDONS_DIR.clone();
+            addon_dir.push("test-adapter");
 
-    let mut addon_dir = home_dir.clone();
-    addon_dir.push("addons");
-    addon_dir.push("test-adapter");
+            ProcessManager::from_registry().do_send(StartAddon {
+                home: user_config::BASE_DIR.clone(),
+                id: String::from("test-adapter"),
+                path: addon_dir,
+                exec: String::from("{path}/target/debug/{name}"),
+            });
+        });
 
-    ProcessManager::from_registry().do_send(StartAddon {
-        home: home_dir,
-        id: String::from("test-adapter"),
-        path: addon_dir,
-        exec: String::from("{path}/target/debug/{name}"),
+        actix::spawn(async {
+            addon_socket::start().await.expect("Starting addon socket");
+        });
+
+        system.run().expect("Running system");
     });
 
-    addon_socket::start().await.expect("Starting addon socket");
+    rest_api::launch().await;
 }
