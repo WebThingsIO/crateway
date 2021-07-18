@@ -19,7 +19,7 @@ pub async fn launch() {
         .expect("Ignite rocket")
         .launch()
         .await
-        .expect("Ignite rocket");
+        .expect("Launch rocket");
 }
 
 #[cfg(test)]

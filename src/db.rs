@@ -5,8 +5,7 @@
 
 use crate::model::Thing;
 use crate::user_config;
-use rusqlite::OptionalExtension;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde_json;
 use std::{ops::Deref, sync::Mutex};
 
@@ -111,7 +110,7 @@ mod tests {
 
     fn setup() {
         let dir = env::temp_dir().join(".webthingsio");
-        fs::remove_dir_all(&dir);
+        fs::remove_dir_all(&dir); // We really don't want to handle this result, since we don't care if the directory never existed
         env::set_var("WEBTHINGS_HOME", dir);
     }
 

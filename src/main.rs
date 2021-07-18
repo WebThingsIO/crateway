@@ -50,7 +50,6 @@ async fn main() {
             addon_dir.push("test-adapter");
 
             ProcessManager::from_registry().do_send(StartAddon {
-                home: user_config::BASE_DIR.clone(),
                 id: String::from("test-adapter"),
                 path: addon_dir,
                 exec: String::from("{path}/target/debug/{name}"),
