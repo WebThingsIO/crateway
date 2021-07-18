@@ -16,3 +16,14 @@ actix = "0.12"
 actix-web = "4.0.0-beta.8"
 actix-web-actors = "4.0.0-beta.6"
 dirs ="3.0.2"
+tokio = "1.8.1"
+lazy_static = "1.4.0"
+rusqlite = "0.25.3"
+
+[dependencies.rocket]
+version = "0.5.0-rc.1"
+features = ["json"]
+
+[dev-dependencies]
+rusty-fork = "0.3.0"
+serial_test = "0.4.0"

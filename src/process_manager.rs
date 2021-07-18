@@ -1,12 +1,15 @@
-use actix::prelude::*;
-use actix::{Actor, Context};
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+use crate::user_config;
+use actix::{prelude::*, Actor, Context};
 use log::{debug, error, info, log, trace, Level};
-use std::io::{Read, Result};
-use std::process::Child;
 use std::{
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read, Result},
     path::PathBuf,
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     thread,
 };
 
@@ -14,10 +17,10 @@ use std::{
 pub struct ProcessManager;
 
 impl ProcessManager {
-    fn spawn(bin: &str, args: &[&str], home: &str) -> Result<Child> {
+    fn spawn(bin: &str, args: &[&str]) -> Result<Child> {
         Command::new(bin)
             .args(args)
-            .env("WEBTHINGS_HOME", home)
+            .env("WEBTHINGS_HOME", user_config::BASE_DIR.clone())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -68,7 +71,6 @@ impl SystemService for ProcessManager {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct StartAddon {
-    pub home: PathBuf,
     pub id: String,
     pub path: PathBuf,
     pub exec: String,
@@ -78,23 +80,17 @@ impl Handler<StartAddon> for ProcessManager {
     type Result = ();
 
     fn handle(&mut self, msg: StartAddon, _ctx: &mut Context<Self>) -> Self::Result {
-        let StartAddon {
-            home,
-            id,
-            path,
-            exec,
-        } = msg;
+        let StartAddon { id, path, exec } = msg;
 
         info!("Starting {}", id);
 
         let path_str = &path.to_str().expect("Convert path to string");
         let exec_cmd = exec.replace("{name}", &id).replace("{path}", path_str);
         let args: Vec<_> = exec_cmd.split_ascii_whitespace().collect();
-        let home = home.to_str().expect("Convert home to string");
 
         debug!("Spawning {}", exec_cmd);
 
-        match ProcessManager::spawn(args[0], &args[1..], &home) {
+        match ProcessManager::spawn(args[0], &args[1..]) {
             Ok(mut child) => {
                 let stdout = child.stdout.take().expect("Capture standard error");
                 ProcessManager::print(String::from("stdout"), id.clone(), Level::Info, stdout);
