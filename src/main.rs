@@ -24,7 +24,7 @@ use actix::prelude::*;
 use log::{info, LevelFilter};
 use simplelog::{ColorChoice, ConfigBuilder, TermLogger, TerminalMode};
 
-#[rocket::main]
+#[actix_web::main]
 async fn main() {
     TermLogger::init(
         LevelFilter::Debug,
@@ -42,25 +42,16 @@ async fn main() {
 
     info!("Starting gateway");
 
-    tokio::spawn(async {
-        let system = System::new();
+    actix::spawn(async {
+        addon_socket::start().await.expect("Starting addon socket");
+    });
 
-        actix::spawn(async {
-            let mut addon_dir = user_config::ADDONS_DIR.clone();
-            addon_dir.push("test-adapter");
-
-            ProcessManager::from_registry().do_send(StartAddon {
-                id: String::from("test-adapter"),
-                path: addon_dir,
-                exec: String::from("{path}/target/debug/{name}"),
-            });
-        });
-
-        actix::spawn(async {
-            addon_socket::start().await.expect("Starting addon socket");
-        });
-
-        system.run().expect("Running system");
+    let mut addon_dir = user_config::ADDONS_DIR.clone();
+    addon_dir.push("test-adapter");
+    ProcessManager::from_registry().do_send(StartAddon {
+        id: String::from("test-adapter"),
+        path: addon_dir,
+        exec: String::from("{path}/target/debug/{name}"),
     });
 
     rest_api::launch().await;
