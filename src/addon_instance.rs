@@ -3,6 +3,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use crate::addon_manager::{AddonManager, AddonStarted};
+use actix::prelude::*;
 use actix::{Actor, StreamHandler};
 use actix_web_actors::ws;
 use log::{debug, error, trace};
@@ -56,6 +58,11 @@ impl AddonInstance {
 
         if let Message::PluginRegisterRequest(msg) = msg {
             let id = msg.plugin_id();
+
+            AddonManager::from_registry().do_send(AddonStarted {
+                id: id.to_owned(),
+                addr: ctx.address(),
+            });
 
             let response: Message = PluginRegisterResponseMessageData {
                 gateway_version: env!("CARGO_PKG_VERSION").to_owned(),

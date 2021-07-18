@@ -10,7 +10,9 @@ extern crate rocket;
 #[macro_use]
 extern crate lazy_static;
 
+mod addon;
 mod addon_instance;
+mod addon_manager;
 mod addon_socket;
 mod db;
 mod model;
@@ -19,7 +21,7 @@ mod rest_api;
 mod router;
 mod user_config;
 
-use crate::process_manager::{ProcessManager, StartAddon};
+use crate::addon_manager::{AddonManager, LoadAddons};
 use actix::prelude::*;
 use log::{info, LevelFilter};
 use simplelog::{ColorChoice, ConfigBuilder, TermLogger, TerminalMode};
@@ -46,12 +48,8 @@ async fn main() {
         addon_socket::start().await.expect("Starting addon socket");
     });
 
-    let mut addon_dir = user_config::ADDONS_DIR.clone();
-    addon_dir.push("test-adapter");
-    ProcessManager::from_registry().do_send(StartAddon {
-        id: String::from("test-adapter"),
-        path: addon_dir,
-        exec: String::from("{path}/target/debug/{name}"),
+    AddonManager::from_registry().do_send(LoadAddons {
+        addon_dir: user_config::ADDONS_DIR.clone(),
     });
 
     rest_api::launch().await;
