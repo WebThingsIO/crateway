@@ -118,7 +118,7 @@ impl AddonManager {
                     let exec = manifest.gateway_specific_settings.webthings.exec.clone();
                     let addon = Addon::new(manifest);
                     self.installed_addons.insert(id.to_owned(), addon);
-                    
+
                     info!("Loading add-on {}", id);
                     ProcessManager::from_registry().do_send(StartAddon { path, id, exec });
                 }
