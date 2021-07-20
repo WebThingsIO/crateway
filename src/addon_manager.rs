@@ -94,43 +94,39 @@ impl Handler<AddonStopped> for AddonManager {
 impl AddonManager {
     pub fn load_addons(&mut self, addon_dir: PathBuf) {
         match fs::read_dir(addon_dir) {
-            Ok(read_dir) => {
-                for entry in read_dir {
-                    match entry {
-                        Ok(dir_entry) => {
-                            self.load_addon(dir_entry.path());
-                        }
-                        Err(err) => {
-                            error!("Could not enumerate addon dir entry: {}", err)
-                        }
-                    }
-                }
+            Ok(read_dir) => read_dir,
+            Err(err) => {
+                error!("Could not load addons: {}", err);
+                return;
             }
-            Err(err) => error!("Could not load addons: {}", err),
         }
+        .filter_map(|read_dir| {
+            if let Err(err) = &read_dir {
+                error!("Could not enumerate addon dir entry: {}", err);
+            }
+            read_dir.ok()
+        })
+        .for_each(|dir_entry| self.load_addon(dir_entry.path()));
     }
 
     fn load_addon(&mut self, path: PathBuf) {
         match fs::File::open(path.join("manifest.json")) {
-            Ok(file) => match serde_json::from_reader(file) {
-                Ok(manifest) => {
+            Ok(file) => {
+                if let Ok(manifest) = serde_json::from_reader(file) {
                     let manifest: Manifest = manifest;
                     let id = manifest.id.clone();
                     let exec = manifest.gateway_specific_settings.webthings.exec.clone();
                     let addon = Addon::new(manifest);
                     self.installed_addons.insert(id.to_owned(), addon);
-
+                    
                     info!("Loading add-on {}", id);
                     ProcessManager::from_registry().do_send(StartAddon { path, id, exec });
                 }
-                Err(_) => {}
-            },
-            Err(err) => {
-                error!(
-                    "Could not open manifest.json file in {:?} found: {}",
-                    path, err
-                );
             }
+            Err(err) => error!(
+                "Could not open manifest.json file in {:?} found: {}",
+                path, err
+            ),
         }
     }
 }
