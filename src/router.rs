@@ -3,11 +3,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::{db::Db, model::Thing};
+use crate::{
+    addon_configuration::AddonConfiguration,
+    addon_manager::{AddonManager, UpdateAddonConfiguration},
+    db::Db,
+    model::Thing,
+};
+use actix::prelude::*;
 use rocket::{http::Status, response::status, serde::json::Json, Route, State};
 
 pub fn routes() -> Vec<Route> {
-    routes![get_things, get_thing]
+    routes![get_things, get_thing, put_addon]
 }
 
 #[get("/things")]
@@ -45,4 +51,9 @@ fn get_thing(
             }
         }
     }
+}
+
+#[put("/addons/<addon_id>", data = "<data>")]
+fn put_addon(addon_id: String, data: Json<AddonConfiguration>) {
+    AddonManager::from_registry().do_send(UpdateAddonConfiguration(addon_id, data.0));
 }

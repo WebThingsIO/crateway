@@ -3,11 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::{
-    addon::Addon,
-    addon_instance::AddonInstance,
-    process_manager::{ProcessManager, StartAddon},
-};
+use crate::{addon::Addon, addon_configuration::AddonConfiguration, addon_instance::AddonInstance};
 use actix::prelude::*;
 use actix::{Actor, Context};
 use log::{error, info};
@@ -91,6 +87,29 @@ impl Handler<AddonStopped> for AddonManager {
     }
 }
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct UpdateAddonConfiguration(pub String, pub AddonConfiguration);
+
+impl Handler<UpdateAddonConfiguration> for AddonManager {
+    type Result = ();
+
+    fn handle(&mut self, msg: UpdateAddonConfiguration, _ctx: &mut Context<Self>) -> Self::Result {
+        let UpdateAddonConfiguration(id, config) = msg;
+        let addon = self.installed_addons.get_mut(&id);
+        match addon {
+            Some(addon) => {
+                addon.stop();
+                addon.config = config;
+                addon.start();
+            }
+            None => {
+                error!("Package {} not installed", id)
+            }
+        }
+    }
+}
+
 impl AddonManager {
     pub fn load_addons(&mut self, addon_dir: PathBuf) {
         match fs::read_dir(addon_dir) {
@@ -114,13 +133,10 @@ impl AddonManager {
             Ok(file) => {
                 if let Ok(manifest) = serde_json::from_reader(file) {
                     let manifest: Manifest = manifest;
-                    let id = manifest.id.clone();
-                    let exec = manifest.gateway_specific_settings.webthings.exec.clone();
-                    let addon = Addon::new(manifest);
-                    self.installed_addons.insert(id.to_owned(), addon);
-
-                    info!("Loading add-on {}", id);
-                    ProcessManager::from_registry().do_send(StartAddon { path, id, exec });
+                    let addon = Addon::new(manifest, path, AddonConfiguration::new(true));
+                    info!("Loading add-on {}", addon.id());
+                    addon.start();
+                    self.installed_addons.insert(addon.id().to_owned(), addon);
                 }
             }
             Err(err) => error!(

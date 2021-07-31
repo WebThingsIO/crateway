@@ -11,6 +11,7 @@ extern crate rocket;
 extern crate lazy_static;
 
 mod addon;
+mod addon_configuration;
 mod addon_instance;
 mod addon_manager;
 mod addon_socket;
