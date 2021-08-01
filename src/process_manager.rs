@@ -73,7 +73,7 @@ impl SystemService for ProcessManager {
 }
 
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), ()>")]
 pub struct StartAddon {
     pub id: String,
     pub path: PathBuf,
@@ -81,13 +81,13 @@ pub struct StartAddon {
 }
 
 impl Handler<StartAddon> for ProcessManager {
-    type Result = ();
+    type Result = Result<(), ()>;
 
     fn handle(&mut self, msg: StartAddon, _ctx: &mut Context<Self>) -> Self::Result {
         let StartAddon { id, path, exec } = msg;
         if self.processes.contains_key(&id) {
             error!("Process for {} already running", id);
-            return;
+            return Err(());
         }
 
         info!("Starting {}", id);
@@ -107,32 +107,40 @@ impl Handler<StartAddon> for ProcessManager {
                 ProcessManager::print(String::from("stderr"), id.clone(), Level::Error, stderr);
 
                 self.processes.insert(id, child);
+                Ok(())
             }
-            Err(err) => error!(
-                "Could not start addon process {} with {}: {}",
-                id, exec_cmd, err
-            ),
+            Err(err) => {
+                error!(
+                    "Could not start addon process {} with {}: {}",
+                    id, exec_cmd, err
+                );
+                Err(())
+            }
         }
     }
 }
 
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), ()>")]
 pub struct StopAddon {
     pub id: String,
 }
 
 impl Handler<StopAddon> for ProcessManager {
-    type Result = ();
+    type Result = Result<(), ()>;
 
     fn handle(&mut self, msg: StopAddon, _ctx: &mut Context<Self>) -> Self::Result {
         let StopAddon { id } = msg;
-        if let Some(child) = self.processes.get_mut(&id) {
+        if let Some(mut child) = self.processes.remove(&id) {
             info!("Stopping {}", &id);
-            child.kill().expect(&format!("Killing process for {}", id));
-            self.processes.remove(&id);
+            if let Err(_) = child.kill() {
+                error!("Failed to kill process for {}", id);
+                return Err(());
+            }
+            Ok(())
         } else {
             error!("Process for {} not running!", id);
+            Err(())
         }
     }
 }

@@ -4,13 +4,17 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::{
-    addon_configuration::AddonConfiguration,
-    addon_manager::{AddonManager, UpdateAddonConfiguration},
+    addon_manager::{AddonManager, DisableAddon, EnableAddon},
     db::Db,
     model::Thing,
 };
 use actix::prelude::*;
-use rocket::{http::Status, response::status, serde::json::Json, Route, State};
+use rocket::{
+    http::Status,
+    response::status,
+    serde::{json::Json, Deserialize, Serialize},
+    Route, State,
+};
 
 pub fn routes() -> Vec<Route> {
     routes![get_things, get_thing, put_addon]
@@ -53,7 +57,37 @@ fn get_thing(
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct AddonEnabledState {
+    enabled: bool,
+}
+
 #[put("/addons/<addon_id>", data = "<data>")]
-fn put_addon(addon_id: String, data: Json<AddonConfiguration>) {
-    AddonManager::from_registry().do_send(UpdateAddonConfiguration(addon_id, data.0));
+async fn put_addon(
+    addon_id: String,
+    data: Json<AddonEnabledState>,
+) -> Result<Json<AddonEnabledState>, status::Custom<String>> {
+    if data.0.enabled {
+        match AddonManager::from_registry()
+            .send(EnableAddon(addon_id.to_owned()))
+            .await
+        {
+            Ok(Ok(())) => Ok(Json(AddonEnabledState { enabled: true })),
+            Ok(Err(_)) | Err(_) => Err(status::Custom(
+                Status::InternalServerError,
+                "Failed to enable addon".to_owned(),
+            )),
+        }
+    } else {
+        match AddonManager::from_registry()
+            .send(DisableAddon(addon_id.to_owned()))
+            .await
+        {
+            Ok(Ok(())) => Ok(Json(AddonEnabledState { enabled: false })),
+            Ok(Err(_)) | Err(_) => Err(status::Custom(
+                Status::InternalServerError,
+                "Failed to disable addon".to_owned(),
+            )),
+        }
+    }
 }
