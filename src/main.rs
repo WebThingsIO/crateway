@@ -10,11 +10,13 @@ extern crate rocket;
 #[macro_use]
 extern crate lazy_static;
 
+mod adapter;
 mod addon;
 mod addon_instance;
 mod addon_manager;
 mod addon_socket;
 mod db;
+mod device;
 mod model;
 mod process_manager;
 mod rest_api;
