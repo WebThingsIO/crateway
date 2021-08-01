@@ -4,13 +4,28 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use rust_manifest_types::Manifest;
+use std::path::PathBuf;
 
 pub struct Addon {
     pub manifest: Manifest,
+    pub path: PathBuf,
+    pub enabled: bool,
 }
 
 impl Addon {
-    pub fn new(manifest: Manifest) -> Self {
-        Self { manifest }
+    pub fn new(manifest: Manifest, path: PathBuf, enabled: bool) -> Self {
+        Self {
+            manifest,
+            path,
+            enabled,
+        }
+    }
+
+    pub fn exec(&self) -> &str {
+        &self.manifest.gateway_specific_settings.webthings.exec
+    }
+
+    pub fn id(&self) -> &str {
+        &self.manifest.id
     }
 }

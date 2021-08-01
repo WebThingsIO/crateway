@@ -3,21 +3,27 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::user_config;
+use crate::{
+    addon_manager::{AddonManager, AddonStopped},
+    user_config,
+};
 use actix::{prelude::*, Actor, Context};
-use log::{debug, error, info, log, trace, Level};
+use log::{debug, error, info, log, Level};
 use std::{
-    io::{BufRead, BufReader, Read, Result},
+    collections::HashMap,
+    io::{BufRead, BufReader, Read, Result as IOResult},
     path::PathBuf,
     process::{Child, Command, Stdio},
     thread,
 };
 
 #[derive(Default)]
-pub struct ProcessManager;
+pub struct ProcessManager {
+    processes: HashMap<String, Child>,
+}
 
 impl ProcessManager {
-    fn spawn(bin: &str, args: &[&str]) -> Result<Child> {
+    fn spawn(bin: &str, args: &[&str]) -> IOResult<Child> {
         Command::new(bin)
             .args(args)
             .env("WEBTHINGS_HOME", user_config::BASE_DIR.clone())
@@ -36,14 +42,12 @@ impl ProcessManager {
                 .filter_map(|line| line.ok())
                 .for_each(|line| log!(level, "{} {}", prefix, line));
 
-            trace!("Poll thread for {} {} finished", prefix, name);
-        });
-    }
-
-    fn wait_in_background(name: String, mut child: Child) {
-        thread::spawn(move || {
-            let code = child.wait().expect("Obtain exit code");
-            info!("Process of {} exited with code {}", name, code);
+            if name == "stdout" {
+                System::new().block_on(async {
+                    AddonManager::from_registry().do_send(AddonStopped(prefix.to_owned()));
+                    info!("Process of {} exited", prefix);
+                });
+            }
         });
     }
 }
@@ -69,7 +73,7 @@ impl SystemService for ProcessManager {
 }
 
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), ()>")]
 pub struct StartAddon {
     pub id: String,
     pub path: PathBuf,
@@ -77,10 +81,14 @@ pub struct StartAddon {
 }
 
 impl Handler<StartAddon> for ProcessManager {
-    type Result = ();
+    type Result = Result<(), ()>;
 
     fn handle(&mut self, msg: StartAddon, _ctx: &mut Context<Self>) -> Self::Result {
         let StartAddon { id, path, exec } = msg;
+        if self.processes.contains_key(&id) {
+            error!("Process for {} already running", id);
+            return Err(());
+        }
 
         info!("Starting {}", id);
 
@@ -98,12 +106,41 @@ impl Handler<StartAddon> for ProcessManager {
                 let stderr = child.stderr.take().expect("Capture standard error");
                 ProcessManager::print(String::from("stderr"), id.clone(), Level::Error, stderr);
 
-                ProcessManager::wait_in_background(id, child);
+                self.processes.insert(id, child);
+                Ok(())
             }
-            Err(err) => error!(
-                "Could not start addon process {} with {}: {}",
-                id, exec_cmd, err
-            ),
+            Err(err) => {
+                error!(
+                    "Could not start addon process {} with {}: {}",
+                    id, exec_cmd, err
+                );
+                Err(())
+            }
+        }
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<(), ()>")]
+pub struct StopAddon {
+    pub id: String,
+}
+
+impl Handler<StopAddon> for ProcessManager {
+    type Result = Result<(), ()>;
+
+    fn handle(&mut self, msg: StopAddon, _ctx: &mut Context<Self>) -> Self::Result {
+        let StopAddon { id } = msg;
+        if let Some(mut child) = self.processes.remove(&id) {
+            info!("Stopping {}", &id);
+            if let Err(_) = child.kill() {
+                error!("Failed to kill process for {}", id);
+                return Err(());
+            }
+            Ok(())
+        } else {
+            error!("Process for {} not running!", id);
+            Err(())
         }
     }
 }
