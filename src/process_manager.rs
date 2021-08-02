@@ -3,52 +3,35 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::{
-    addon_manager::{AddonManager, AddonStopped},
-    user_config,
-};
+use crate::user_config;
 use actix::{prelude::*, Actor, Context};
-use log::{debug, error, info, log, Level};
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader, Read, Result as IOResult},
-    path::PathBuf,
-    process::{Child, Command, Stdio},
-    thread,
+use async_process::Command;
+use futures::{
+    future::{AbortHandle, Abortable},
+    {io::BufReader, prelude::*},
 };
+use log::{debug, error, info, log, Level};
+use std::{collections::HashMap, path::PathBuf, process::Stdio};
 
 #[derive(Default)]
 pub struct ProcessManager {
-    processes: HashMap<String, Child>,
+    processes: HashMap<String, AbortHandle>,
 }
 
 impl ProcessManager {
-    fn spawn(bin: &str, args: &[&str]) -> IOResult<Child> {
-        Command::new(bin)
-            .args(args)
-            .env("WEBTHINGS_HOME", user_config::BASE_DIR.clone())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-    }
-
-    fn print<T>(name: String, prefix: String, level: Level, stream: T)
+    fn print<T>(prefix: String, level: Level, stream: Option<T>)
     where
-        T: Read + Send + 'static,
+        T: AsyncRead + Unpin + 'static,
     {
-        thread::spawn(move || {
-            BufReader::new(stream)
-                .lines()
-                .filter_map(|line| line.ok())
-                .for_each(|line| log!(level, "{} {}", prefix, line));
+        if let Some(stream) = stream {
+            actix::spawn(async move {
+                let mut lines = BufReader::new(stream).lines();
 
-            if name == "stdout" {
-                System::new().block_on(async {
-                    AddonManager::from_registry().do_send(AddonStopped(prefix.to_owned()));
-                    info!("Process of {} exited", prefix);
-                });
-            }
-        });
+                while let Some(Ok(line)) = lines.next().await {
+                    log!(level, "{}: {:?}", prefix, line);
+                }
+            });
+        }
     }
 }
 
@@ -98,15 +81,40 @@ impl Handler<StartAddon> for ProcessManager {
 
         debug!("Spawning {}", exec_cmd);
 
-        match ProcessManager::spawn(args[0], &args[1..]) {
+        let child = Command::new(args[0])
+            .args(&args[1..])
+            .env("WEBTHINGS_HOME", user_config::BASE_DIR.clone())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
+
+        match child {
             Ok(mut child) => {
-                let stdout = child.stdout.take().expect("Capture standard error");
-                ProcessManager::print(String::from("stdout"), id.clone(), Level::Info, stdout);
+                debug!("Started process {} for {}", child.id(), id);
 
-                let stderr = child.stderr.take().expect("Capture standard error");
-                ProcessManager::print(String::from("stderr"), id.clone(), Level::Error, stderr);
+                let (abort_handle, abort_registration) = AbortHandle::new_pair();
+                self.processes.insert(id.clone(), abort_handle);
 
-                self.processes.insert(id, child);
+                Self::print(id.to_owned(), Level::Info, child.stdout.take());
+                Self::print(id.to_owned(), Level::Error, child.stderr.take());
+
+                actix::spawn(async move {
+                    match Abortable::new(child.status(), abort_registration).await {
+                        Ok(Ok(status)) => {
+                            info!("Process of {} exited with code {}", id, status);
+                        }
+                        Ok(Err(err)) => {
+                            error!("Failed to wait for process to terminate: {}", err);
+                        }
+                        Err(_) => {
+                            info!("Killing process {}", child.id());
+                            if let Err(err) = child.kill() {
+                                error!("Could not kill process {} of {}: {}", child.id(), id, err)
+                            }
+                        }
+                    };
+                });
+
                 Ok(())
             }
             Err(err) => {
@@ -131,12 +139,9 @@ impl Handler<StopAddon> for ProcessManager {
 
     fn handle(&mut self, msg: StopAddon, _ctx: &mut Context<Self>) -> Self::Result {
         let StopAddon { id } = msg;
-        if let Some(mut child) = self.processes.remove(&id) {
+        if let Some(abort_handle) = self.processes.remove(&id) {
             info!("Stopping {}", &id);
-            if let Err(_) = child.kill() {
-                error!("Failed to kill process for {}", id);
-                return Err(());
-            }
+            abort_handle.abort();
             Ok(())
         } else {
             error!("Process for {} not running!", id);
