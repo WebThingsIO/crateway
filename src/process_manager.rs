@@ -10,12 +10,29 @@ use futures::{
     future::{AbortHandle, Abortable},
     {io::BufReader, prelude::*},
 };
-use log::{debug, error, info};
+use log::{debug, error, info, log, Level};
 use std::{collections::HashMap, path::PathBuf, process::Stdio};
 
 #[derive(Default)]
 pub struct ProcessManager {
     processes: HashMap<String, AbortHandle>,
+}
+
+impl ProcessManager {
+    fn print<T>(prefix: String, level: Level, stream: Option<T>)
+    where
+        T: AsyncRead + Unpin + 'static,
+    {
+        if let Some(stream) = stream {
+            actix::spawn(async move {
+                let mut lines = BufReader::new(stream).lines();
+
+                while let Some(Ok(line)) = lines.next().await {
+                    log!(level, "{}: {:?}", prefix, line);
+                }
+            });
+        }
+    }
 }
 
 impl Actor for ProcessManager {
@@ -78,29 +95,8 @@ impl Handler<StartAddon> for ProcessManager {
                 let (abort_handle, abort_registration) = AbortHandle::new_pair();
                 self.processes.insert(id.clone(), abort_handle);
 
-                if let Some(stdout) = child.stdout.take() {
-                    let id = id.clone();
-
-                    actix::spawn(async move {
-                        let mut lines = BufReader::new(stdout).lines();
-
-                        while let Some(Ok(line)) = lines.next().await {
-                            debug!("{}: {:?}", id, line);
-                        }
-                    });
-                }
-
-                if let Some(stderr) = child.stderr.take() {
-                    let id = id.clone();
-
-                    actix::spawn(async move {
-                        let mut lines = BufReader::new(stderr).lines();
-
-                        while let Some(Ok(line)) = lines.next().await {
-                            error!("{}: {:?}", id, line);
-                        }
-                    });
-                }
+                Self::print(id.to_owned(), Level::Info, child.stdout.take());
+                Self::print(id.to_owned(), Level::Error, child.stderr.take());
 
                 actix::spawn(async move {
                     match Abortable::new(child.status(), abort_registration).await {
@@ -146,7 +142,6 @@ impl Handler<StopAddon> for ProcessManager {
         if let Some(abort_handle) = self.processes.remove(&id) {
             info!("Stopping {}", &id);
             abort_handle.abort();
-            self.processes.remove(&id);
             Ok(())
         } else {
             error!("Process for {} not running!", id);
