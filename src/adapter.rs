@@ -25,12 +25,12 @@ impl Adapter {
         match self.devices.get_mut(&id) {
             Some(device) => {
                 device.update(description);
-                info!("Device {} updated", id);
+                info!("Device {} of adapter {} updated", self.id, id);
             }
             None => {
                 let device = Device::new(description);
                 self.devices.insert(id.clone(), device);
-                info!("Device {} added", id);
+                info!("Device {} of adapter {} added", self.id, id);
             }
         }
     }
