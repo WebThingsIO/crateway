@@ -6,7 +6,6 @@
 use crate::model::Thing;
 use crate::user_config;
 use rusqlite::{params, Connection, OptionalExtension};
-use serde_json;
 use std::{ops::Deref, sync::Mutex};
 
 pub struct Db(Mutex<Connection>);
@@ -16,8 +15,7 @@ impl Db {
         let conn = Connection::open(user_config::CONFIG_DIR.join("db.sqlite3"))
             .expect("Open database file");
         create_tables(&conn);
-        let db = Self(Mutex::new(conn));
-        db
+        Self(Mutex::new(conn))
     }
 
     pub fn get_things(&self) -> Result<Vec<Thing>, &'static str> {
