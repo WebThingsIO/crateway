@@ -100,18 +100,18 @@ impl AddonInstance {
                 self.adapters.insert(msg.data.adapter_id, adapter);
             }
             Message::DeviceAddedNotification(msg) => {
-                match self.adapters.get_mut(&msg.data.adapter_id) {
-                    Some(adapter) => {
-                        adapter.add_device(msg.data.device);
-                    }
-                    None => {
-                        error!("No adapter with id {} found", msg.data.adapter_id)
-                    }
-                }
+                let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
+                adapter.add_device(msg.data.device);
             }
             _ => {}
         };
 
         Ok(())
+    }
+
+    fn get_adapter_mut(&mut self, id: &str) -> Result<&mut Adapter, String> {
+        self.adapters
+            .get_mut(id)
+            .ok_or(format!("No adapter with id {} found", id))
     }
 }
