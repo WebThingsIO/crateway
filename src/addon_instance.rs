@@ -110,9 +110,8 @@ impl AddonInstance {
     }
 
     fn get_adapter_mut(&mut self, id: &str) -> Result<&mut Adapter, String> {
-        match self.adapters.get_mut(id) {
-            Some(adapter) => Ok(adapter),
-            None => Err(format!("No adapter with id {} found", id)),
-        }
+        self.adapters
+            .get_mut(id)
+            .ok_or(format!("No adapter with id {} found", id))
     }
 }
