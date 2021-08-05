@@ -59,7 +59,7 @@ impl Handler<LoadAddons> for AddonManager {
             Ok(read_dir) => read_dir,
             Err(err) => {
                 error!("Could not load addons: {}", err);
-                return Box::pin(async { () });
+                return Box::pin(async {});
             }
         }
         .filter_map(|read_dir| {
@@ -69,7 +69,7 @@ impl Handler<LoadAddons> for AddonManager {
             read_dir.ok()
         });
 
-        return Box::pin(async move {
+        Box::pin(async move {
             for dir_entry in iter {
                 match Self::from_registry()
                     .send(LoadAddon {
@@ -86,7 +86,7 @@ impl Handler<LoadAddons> for AddonManager {
                 }
             }
             info!("Finished loading addons");
-        });
+        })
     }
 }
 
@@ -139,7 +139,7 @@ impl Handler<LoadAddon> for AddonManager {
                 path, err
             ),
         }
-        return Box::pin(async { Err(()) });
+        Box::pin(async { Err(()) })
     }
 }
 
@@ -192,15 +192,15 @@ impl Handler<EnableAddon> for AddonManager {
                 addon.enabled = true;
                 let path = addon.path.clone();
 
-                return Box::pin(async move {
-                    match Self::from_registry().send(LoadAddon { path: path }).await {
+                Box::pin(async move {
+                    match Self::from_registry().send(LoadAddon { path }).await {
                         Err(_) | Ok(Err(_)) => {
                             error!("Failed to load addon {}", id);
                             Err(())
                         }
                         Ok(Ok(())) => Ok(()),
                     }
-                });
+                })
             }
             None => {
                 error!("Package {} not installed", id);

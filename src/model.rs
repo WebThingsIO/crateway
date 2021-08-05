@@ -19,6 +19,6 @@ impl Thing {
         if let Value::Object(ref mut map) = description {
             map.insert("id".to_owned(), Value::String(id.to_owned()));
         }
-        Ok(serde_json::from_value(description).map_err(|_| "Parse Thing")?)
+        serde_json::from_value(description).map_err(|_| "Parse Thing")
     }
 }

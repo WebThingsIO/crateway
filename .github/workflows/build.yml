@@ -23,6 +23,11 @@ jobs:
         with:
           command: build
       - name: Lint
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all-features -- -D clippy::all
+      - name: Lint Hints
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
