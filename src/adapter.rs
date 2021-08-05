@@ -21,16 +21,15 @@ impl Adapter {
 
     pub fn add_device(&mut self, description: DeviceDescription) {
         let id = description.id.clone();
+        let device = Device::new(description);
+        let old_device = self.devices.insert(id.clone(), device);
 
-        match self.devices.get_mut(&id) {
-            Some(device) => {
-                device.update(description);
-                info!("Device {} of adapter {} updated", self.id, id);
+        match old_device {
+            Some(_) => {
+                info!("Device {} of adapter {} updated", id, self.id);
             }
             None => {
-                let device = Device::new(description);
-                self.devices.insert(id.clone(), device);
-                info!("Device {} of adapter {} added", self.id, id);
+                info!("Device {} of adapter {} added", id, self.id);
             }
         }
     }

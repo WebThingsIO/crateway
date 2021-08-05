@@ -12,10 +12,4 @@ impl Device {
     pub fn new(description: DeviceDescription) -> Self {
         Self { description }
     }
-
-    pub fn update(&mut self, description: DeviceDescription) {
-        let id = description.id.clone();
-        self.description = description;
-        info!("Device updated {}", id)
-    }
 }
