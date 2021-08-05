@@ -26,10 +26,10 @@ impl Adapter {
 
         match old_device {
             Some(_) => {
-                info!("Device {} updated", id);
+                info!("Device {} of adapter {} updated", id, self.id);
             }
             None => {
-                info!("Device {} added", id);
+                info!("Device {} of adapter {} added", id, self.id);
             }
         }
     }
