@@ -103,6 +103,10 @@ impl AddonInstance {
                 let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
                 adapter.add_device(msg.data.device);
             }
+            Message::DevicePropertyChangedNotification(msg) => {
+                let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
+                adapter.update_property(msg.data.device_id, msg.data.property)?;
+            }
             _ => {}
         };
 
