@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#![feature(proc_macro_hygiene, decl_macro)]
+#![feature(proc_macro_hygiene, decl_macro, result_flattening)]
 
 #[macro_use]
 extern crate rocket;
@@ -17,6 +17,7 @@ mod addon_manager;
 mod addon_socket;
 mod db;
 mod device;
+mod macros;
 mod model;
 mod process_manager;
 mod rest_api;
@@ -25,6 +26,7 @@ mod user_config;
 
 use crate::addon_manager::{AddonManager, LoadAddons};
 use actix::prelude::*;
+use anyhow::anyhow;
 use log::{info, LevelFilter};
 use simplelog::{ColorChoice, ConfigBuilder, TermLogger, TerminalMode};
 
@@ -50,8 +52,17 @@ async fn main() {
         addon_socket::start().await.expect("Starting addon socket");
     });
 
-    AddonManager::from_registry().do_send(LoadAddons {
-        addon_dir: user_config::ADDONS_DIR.clone(),
+    actix::spawn(async {
+        if let Err(e) = AddonManager::from_registry()
+            .send(LoadAddons {
+                addon_dir: user_config::ADDONS_DIR.clone(),
+            })
+            .await
+            .map_err(|e| anyhow!(e))
+            .flatten()
+        {
+            error!("Failed load addons: {:?}", e);
+        }
     });
 
     rest_api::launch().await;

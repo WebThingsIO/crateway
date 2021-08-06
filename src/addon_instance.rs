@@ -3,14 +3,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::adapter::Adapter;
-use crate::addon_manager::{AddonManager, AddonStarted};
+use crate::{
+    adapter::Adapter,
+    addon_manager::{AddonManager, AddonStarted},
+};
 use actix::prelude::*;
 use actix::{Actor, StreamHandler};
 use actix_web_actors::ws;
+use anyhow::{anyhow, Error};
 use log::{debug, error, trace};
 use std::collections::HashMap;
-use std::error::Error;
 use webthings_gateway_ipc_types::{
     Message, MessageBase, PluginRegisterResponseMessageData, Preferences, Units, UserProfile,
 };
@@ -33,11 +35,8 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for AddonInstance {
                 let msg = text.parse::<Message>().unwrap();
                 let id = msg.plugin_id().to_owned();
 
-                match self.on_msg(msg, ctx) {
-                    Ok(()) => {}
-                    Err(err) => {
-                        error!("Addon instance {:?} failed to handle message: {}", id, err)
-                    }
+                if let Err(err) = self.on_msg(msg, ctx) {
+                    error!("Addon instance {:?} failed to handle message: {}", id, err);
                 }
             }
             Ok(ws::Message::Binary(_)) => {
@@ -59,7 +58,7 @@ impl AddonInstance {
         &mut self,
         msg: Message,
         ctx: &mut ws::WebsocketContext<Self>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Error> {
         debug!("Received {:?}", msg);
 
         match msg {
@@ -109,9 +108,9 @@ impl AddonInstance {
         Ok(())
     }
 
-    fn get_adapter_mut(&mut self, id: &str) -> Result<&mut Adapter, String> {
+    fn get_adapter_mut(&mut self, id: &str) -> Result<&mut Adapter, Error> {
         self.adapters
             .get_mut(id)
-            .ok_or(format!("No adapter with id {} found", id))
+            .ok_or_else(|| anyhow!("No adapter with id {} found", id))
     }
 }

@@ -6,10 +6,13 @@
 use crate::{
     addon::Addon,
     addon_instance::AddonInstance,
+    macros::{bail_fut, try_fut},
     process_manager::{ProcessManager, StartAddon, StopAddon},
 };
 use actix::prelude::*;
 use actix::{Actor, Context};
+use anyhow::{anyhow, Context as AnyhowContext, Error};
+use futures::future::join_all;
 use log::{error, info};
 use rust_manifest_types::Manifest;
 use std::{collections::HashMap, fs, path::PathBuf};
@@ -41,13 +44,13 @@ impl SystemService for AddonManager {
 }
 
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), Error>")]
 pub struct LoadAddons {
     pub addon_dir: PathBuf,
 }
 
 impl Handler<LoadAddons> for AddonManager {
-    type Result = ResponseFuture<()>;
+    type Result = ResponseFuture<Result<(), Error>>;
 
     fn handle(
         &mut self,
@@ -55,91 +58,83 @@ impl Handler<LoadAddons> for AddonManager {
         _ctx: &mut Context<Self>,
     ) -> Self::Result {
         info!("Loading addons from {:?}", addon_dir);
-        let iter = match fs::read_dir(addon_dir) {
-            Ok(read_dir) => read_dir,
-            Err(err) => {
-                error!("Could not load addons: {}", err);
-                return Box::pin(async {});
-            }
-        }
-        .filter_map(|read_dir| {
-            if let Err(err) = &read_dir {
-                error!("Could not enumerate addon dir entry: {}", err);
-            }
-            read_dir.ok()
-        });
+        let (futures, paths): (Vec<_>, Vec<_>) =
+            try_fut!(fs::read_dir(addon_dir).context(anyhow!("Could not load addons")))
+                .filter_map(|read_dir| {
+                    if let Err(err) = &read_dir {
+                        error!("Could not enumerate addon dir entry: {}", err);
+                    }
+                    read_dir.ok()
+                })
+                .map(|dir_entry| {
+                    (
+                        Self::from_registry().send(LoadAddon {
+                            path: dir_entry.path(),
+                        }),
+                        dir_entry.path(),
+                    )
+                })
+                .unzip();
 
         Box::pin(async move {
-            for dir_entry in iter {
-                match Self::from_registry()
-                    .send(LoadAddon {
-                        path: dir_entry.path(),
-                    })
-                    .await
-                {
-                    Err(_) | Ok(Err(_)) => {
-                        error!("Failed to load addon from {:?}", dir_entry.path());
-                    }
-                    Ok(Ok(_)) => {
-                        info!("Loaded addon from {:?}", dir_entry.path());
-                    }
-                }
-            }
+            join_all(futures)
+                .await
+                .into_iter()
+                .zip(paths)
+                .map(|(result, path)| {
+                    result
+                        .context(anyhow!("Failed to send load addon message for {:?}", path))?
+                        .context(anyhow!("Faild to load addon from {:?}", path))?;
+                    info!("Loaded addon from {:?}", path);
+                    Ok(())
+                })
+                .collect::<Result<Vec<()>, Error>>()?;
             info!("Finished loading addons");
+            Ok(())
         })
     }
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), Error>")]
 pub struct LoadAddon {
     pub path: PathBuf,
 }
 
 impl Handler<LoadAddon> for AddonManager {
-    type Result = ResponseFuture<Result<(), ()>>;
+    type Result = ResponseFuture<Result<(), Error>>;
 
     fn handle(&mut self, LoadAddon { path }: LoadAddon, _ctx: &mut Context<Self>) -> Self::Result {
-        match fs::File::open(path.join("manifest.json")) {
-            Ok(file) => match serde_json::from_reader(file) {
-                Ok(manifest) => {
-                    let manifest: Manifest = manifest;
-                    let addon = Addon::new(manifest, path, true);
-                    let addon_id = addon.id().to_owned();
-                    self.installed_addons.insert(addon_id.to_owned(), addon);
-                    let addon = self.installed_addons.get(&addon_id).unwrap();
-                    if addon.enabled {
-                        let path = addon.path.to_owned();
-                        let exec = addon.exec().to_owned();
-                        info!("Loading add-on {}", addon_id);
-                        return Box::pin(async move {
-                            match ProcessManager::from_registry()
-                                .send(StartAddon {
-                                    path,
-                                    id: addon_id.to_owned(),
-                                    exec,
-                                })
-                                .await
-                            {
-                                Err(_) | Ok(Err(_)) => {
-                                    error!("Failed to start addon {}", addon_id);
-                                    Err(())
-                                }
-                                Ok(Ok(())) => Ok(()),
-                            }
-                        });
-                    } else {
-                        error!("Addon not enabled: {}", addon.id());
-                    }
-                }
-                Err(err) => error!("Could not read manifest.json: {}", err),
-            },
-            Err(err) => error!(
-                "Could not open manifest.json file in {:?} found: {}",
-                path, err
-            ),
+        let file = try_fut!(fs::File::open(path.join("manifest.json")).context(anyhow!(
+            "Could not open manifest.json file in {:?} found",
+            path,
+        )));
+        let manifest: Manifest = try_fut!(
+            serde_json::from_reader(file).context(anyhow!("Could not read manifest.json"))
+        );
+
+        let addon = Addon::new(manifest, path, true);
+        let addon_id = addon.id().to_owned();
+        let addon_enabled = addon.enabled;
+        let path = addon.path.to_owned();
+        let exec = addon.exec().to_owned();
+        self.installed_addons.insert(addon_id.to_owned(), addon);
+        if !addon_enabled {
+            bail_fut!("Addon not enabled: {}", addon_id)
         }
-        Box::pin(async { Err(()) })
+        info!("Loading add-on {}", addon_id);
+        Box::pin(async move {
+            ProcessManager::from_registry()
+                .send(StartAddon {
+                    path,
+                    id: addon_id.to_owned(),
+                    exec,
+                })
+                .await
+                .context(anyhow!("Failed to start addon {}", addon_id))?
+                .context(anyhow!("Failed to start addon {}", addon_id))?;
+            Ok(())
+        })
     }
 }
 
@@ -175,74 +170,60 @@ impl Handler<AddonStopped> for AddonManager {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), Error>")]
 pub struct EnableAddon(pub String);
 
 impl Handler<EnableAddon> for AddonManager {
-    type Result = ResponseFuture<Result<(), ()>>;
+    type Result = ResponseFuture<Result<(), Error>>;
 
     fn handle(&mut self, msg: EnableAddon, _ctx: &mut Context<Self>) -> Self::Result {
         let EnableAddon(id) = msg;
-        match self.installed_addons.get_mut(&id) {
-            Some(addon) => {
-                if addon.enabled {
-                    error!("Addon {} already enabled!", id);
-                    return Box::pin(async { Err(()) });
-                }
-                addon.enabled = true;
-                let path = addon.path.clone();
-
-                Box::pin(async move {
-                    match Self::from_registry().send(LoadAddon { path }).await {
-                        Err(_) | Ok(Err(_)) => {
-                            error!("Failed to load addon {}", id);
-                            Err(())
-                        }
-                        Ok(Ok(())) => Ok(()),
-                    }
-                })
-            }
-            None => {
-                error!("Package {} not installed", id);
-                Box::pin(async { Err(()) })
-            }
+        let addon = try_fut!(self
+            .installed_addons
+            .get_mut(&id)
+            .ok_or_else(|| anyhow!("Package {} not installed", id)));
+        if addon.enabled {
+            bail_fut!("Addon {} already enabled!", id)
         }
+        addon.enabled = true;
+        let path = addon.path.clone();
+
+        Box::pin(async move {
+            Self::from_registry()
+                .send(LoadAddon { path })
+                .await
+                .context(anyhow!("Failed to load addon {}", id))?
+                .context(anyhow!("Failed to load addon {}", id))?;
+            Ok(())
+        })
     }
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), Error>")]
 pub struct DisableAddon(pub String);
 
 impl Handler<DisableAddon> for AddonManager {
-    type Result = ResponseFuture<Result<(), ()>>;
+    type Result = ResponseFuture<Result<(), Error>>;
 
     fn handle(&mut self, msg: DisableAddon, _ctx: &mut Context<Self>) -> Self::Result {
         let DisableAddon(id) = msg;
-        match self.installed_addons.get_mut(&id) {
-            Some(addon) => {
-                if !addon.enabled {
-                    error!("Addon {} already disabled!", id);
-                    return Box::pin(async { Err(()) });
-                }
-                addon.enabled = false;
-                Box::pin(async move {
-                    match ProcessManager::from_registry()
-                        .send(StopAddon { id: id.to_owned() })
-                        .await
-                    {
-                        Err(_) | Ok(Err(_)) => {
-                            error!("Failed to stop addon {}", id);
-                            Err(())
-                        }
-                        Ok(Ok(())) => Ok(()),
-                    }
-                })
-            }
-            None => {
-                error!("Package {} not installed", id);
-                Box::pin(async { Err(()) })
-            }
+        let addon = try_fut!(self
+            .installed_addons
+            .get_mut(&id)
+            .ok_or_else(|| anyhow!("Package {} not installed", id)));
+
+        if !addon.enabled {
+            bail_fut!("Addon {} already disabled!", id)
         }
+        addon.enabled = false;
+        Box::pin(async move {
+            ProcessManager::from_registry()
+                .send(StopAddon { id: id.to_owned() })
+                .await
+                .context(anyhow!("Failed to stop addon {}", id))?
+                .context(anyhow!("Failed to stop addon {}", id))?;
+            Ok(())
+        })
     }
 }

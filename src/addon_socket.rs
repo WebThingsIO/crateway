@@ -6,15 +6,15 @@
 use crate::addon_instance::AddonInstance;
 use actix_web::{web, App, Error as ActixError, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
+use anyhow::Error;
 use log::{debug, info};
-use std::error::Error;
 
 async fn route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, ActixError> {
     debug!("Incoming websocket connection from {:?}", req.peer_addr());
     ws::start(AddonInstance::new(), &req, stream)
 }
 
-pub async fn start() -> Result<(), Box<dyn Error>> {
+pub async fn start() -> Result<(), Error> {
     info!("Starting addon socket");
 
     HttpServer::new(|| App::new().route("/", web::get().to(route)))
