@@ -12,6 +12,8 @@ pub struct Device {
 
 impl Device {
     pub(crate) fn update_property(&mut self, new_property: Property) -> Result<(), Error> {
+        let id = self.description.id.clone();
+
         let name = new_property
             .name
             .clone()
@@ -20,16 +22,14 @@ impl Device {
             .description
             .properties
             .as_mut()
-            .ok_or(anyhow!("Device {} has no properties", self.description.id))?;
-        let property = properties.get_mut(&name).ok_or(anyhow!(
-            "Device {} has no property called {}",
-            self.description.id,
-            name
-        ))?;
+            .ok_or_else(|| anyhow!("Device {} has no properties", id))?;
+        let property = properties
+            .get_mut(&name)
+            .ok_or_else(|| anyhow!("Device {} has no property called {}", id, name))?;
         if property.value != new_property.value {
             debug!(
                 "Property {} of device {} changed from {:?} to {:?}",
-                name, self.description.id, property.value, new_property.value
+                name, id, property.value, new_property.value
             );
         }
         properties.insert(name, new_property);
