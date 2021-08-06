@@ -4,7 +4,7 @@
 
 use crate::device::Device;
 use std::collections::HashMap;
-use webthings_gateway_ipc_types::Device as DeviceDescription;
+use webthings_gateway_ipc_types::{Device as DeviceDescription, Property as PropertyDescription};
 
 pub struct Adapter {
     id: String,
@@ -31,6 +31,23 @@ impl Adapter {
             None => {
                 info!("Device {} of adapter {} added", id, self.id);
             }
+        }
+    }
+
+    pub fn update_property(
+        &mut self,
+        device_id: String,
+        property: PropertyDescription,
+    ) -> Result<(), String> {
+        match self.devices.get_mut(&device_id) {
+            Some(device) => {
+                device.update_property(property)?;
+                Ok(())
+            }
+            None => Err(format!(
+                "Device {} does not exist in adapter {}",
+                device_id, self.id
+            )),
         }
     }
 }
