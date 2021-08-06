@@ -14,8 +14,8 @@ impl Device {
         let name = new_property
             .name
             .clone()
-            .ok_or(String::from("Property has no name"))?;
-        let mut properties = self
+            .ok_or_else(|| String::from("Property has no name"))?;
+        let properties = self
             .description
             .properties
             .as_mut()
