@@ -5,6 +5,7 @@
 
 use crate::user_config;
 use actix::{prelude::*, Actor, Context};
+use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
 use async_process::Command;
 use futures::{
     future::{AbortHandle, Abortable},
@@ -56,7 +57,7 @@ impl SystemService for ProcessManager {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), Error>")]
 pub struct StartAddon {
     pub id: String,
     pub path: PathBuf,
@@ -64,88 +65,80 @@ pub struct StartAddon {
 }
 
 impl Handler<StartAddon> for ProcessManager {
-    type Result = Result<(), ()>;
+    type Result = Result<(), Error>;
 
     fn handle(&mut self, msg: StartAddon, _ctx: &mut Context<Self>) -> Self::Result {
         let StartAddon { id, path, exec } = msg;
         if self.processes.contains_key(&id) {
-            error!("Process for {} already running", id);
-            return Err(());
+            bail!("Process for {} already running", id)
         }
 
         info!("Starting {}", id);
 
-        let path_str = &path.to_str().expect("Convert path to string");
+        let path_str = &path.to_str().ok_or(anyhow!("Convert path to string"))?;
         let exec_cmd = exec.replace("{name}", &id).replace("{path}", path_str);
         let args: Vec<_> = exec_cmd.split_ascii_whitespace().collect();
 
         debug!("Spawning {}", exec_cmd);
 
-        let child = Command::new(args[0])
+        let mut child = Command::new(args[0])
             .args(&args[1..])
             .env("WEBTHINGS_HOME", user_config::BASE_DIR.clone())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .spawn();
+            .spawn()
+            .context(anyhow!(
+                "Could not start addon process {} with {}",
+                id,
+                exec_cmd,
+            ))?;
 
-        match child {
-            Ok(mut child) => {
-                debug!("Started process {} for {}", child.id(), id);
+        debug!("Started process {} for {}", child.id(), id);
 
-                let (abort_handle, abort_registration) = AbortHandle::new_pair();
-                self.processes.insert(id.clone(), abort_handle);
+        let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        self.processes.insert(id.clone(), abort_handle);
 
-                Self::print(id.to_owned(), Level::Info, child.stdout.take());
-                Self::print(id.to_owned(), Level::Error, child.stderr.take());
+        Self::print(id.to_owned(), Level::Info, child.stdout.take());
+        Self::print(id.to_owned(), Level::Error, child.stderr.take());
 
-                actix::spawn(async move {
-                    match Abortable::new(child.status(), abort_registration).await {
-                        Ok(Ok(status)) => {
-                            info!("Process of {} exited with code {}", id, status);
-                        }
-                        Ok(Err(err)) => {
-                            error!("Failed to wait for process to terminate: {}", err);
-                        }
-                        Err(_) => {
-                            info!("Killing process {}", child.id());
-                            if let Err(err) = child.kill() {
-                                error!("Could not kill process {} of {}: {}", child.id(), id, err)
-                            }
-                        }
-                    };
-                });
+        actix::spawn(async move {
+            match Abortable::new(child.status(), abort_registration).await {
+                Ok(Ok(status)) => {
+                    info!("Process of {} exited with code {}", id, status);
+                }
+                Ok(Err(err)) => {
+                    error!("Failed to wait for process to terminate: {}", err);
+                }
+                Err(_) => {
+                    info!("Killing process {}", child.id());
+                    if let Err(err) = child.kill() {
+                        error!("Could not kill process {} of {}: {}", child.id(), id, err)
+                    }
+                }
+            };
+        });
 
-                Ok(())
-            }
-            Err(err) => {
-                error!(
-                    "Could not start addon process {} with {}: {}",
-                    id, exec_cmd, err
-                );
-                Err(())
-            }
-        }
+        Ok(())
     }
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), Error>")]
 pub struct StopAddon {
     pub id: String,
 }
 
 impl Handler<StopAddon> for ProcessManager {
-    type Result = Result<(), ()>;
+    type Result = Result<(), Error>;
 
     fn handle(&mut self, msg: StopAddon, _ctx: &mut Context<Self>) -> Self::Result {
         let StopAddon { id } = msg;
-        if let Some(abort_handle) = self.processes.remove(&id) {
-            info!("Stopping {}", &id);
-            abort_handle.abort();
-            Ok(())
-        } else {
-            error!("Process for {} not running!", id);
-            Err(())
-        }
+        let abort_handle = self
+            .processes
+            .remove(&id)
+            .ok_or(anyhow!("Process for {} not running!", id))?;
+        info!("Stopping {}", &id);
+        abort_handle.abort();
+        Ok(())
     }
 }

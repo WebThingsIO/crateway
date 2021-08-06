@@ -282,6 +282,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "595d3cfa7a60d4555cb5067b99f07142a08ea778de5cf993f7b75c7d8fabc486"
+
+[[package]]
 name = "async-channel"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -583,6 +589,7 @@ dependencies = [
  "actix",
  "actix-web",
  "actix-web-actors",
+ "anyhow",
  "async-process",
  "dirs",
  "futures",

@@ -9,6 +9,7 @@ use crate::{
     model::Thing,
 };
 use actix::prelude::*;
+use anyhow::anyhow;
 use rocket::{
     http::Status,
     response::status,
@@ -24,7 +25,7 @@ pub fn routes() -> Vec<Route> {
 fn get_things(db: &State<Db>) -> Result<Json<Vec<Thing>>, status::Custom<&'static str>> {
     match db.get_things() {
         Err(e) => {
-            println!("Error during db.get_things: {:?}", e);
+            error!("Error during db.get_things: {:?}", e);
             Err(status::Custom(Status::InternalServerError, "Err"))
         }
         Ok(t) => Ok(Json(t)),
@@ -38,7 +39,7 @@ fn get_thing(
 ) -> Result<Option<Json<Thing>>, status::Custom<String>> {
     match db.get_thing(&thing_id) {
         Err(e) => {
-            println!("Error during db.get_things: {:?}", e);
+            error!("Error during db.get_things: {:?}", e);
             Err(status::Custom(
                 Status::InternalServerError,
                 "Err".to_owned(),
@@ -71,23 +72,33 @@ async fn put_addon(
         match AddonManager::from_registry()
             .send(EnableAddon(addon_id.to_owned()))
             .await
+            .map_err(|e| anyhow!(e))
+            .flatten()
         {
-            Ok(Ok(())) => Ok(Json(AddonEnabledState { enabled: true })),
-            Ok(Err(_)) | Err(_) => Err(status::Custom(
-                Status::InternalServerError,
-                "Failed to enable addon".to_owned(),
-            )),
+            Ok(()) => Ok(Json(AddonEnabledState { enabled: true })),
+            Err(e) => {
+                error!("Failed to enable addon: {:?}", e);
+                Err(status::Custom(
+                    Status::InternalServerError,
+                    "Failed to enable addon".to_owned(),
+                ))
+            }
         }
     } else {
         match AddonManager::from_registry()
             .send(DisableAddon(addon_id.to_owned()))
             .await
+            .map_err(|e| anyhow!(e))
+            .flatten()
         {
-            Ok(Ok(())) => Ok(Json(AddonEnabledState { enabled: false })),
-            Ok(Err(_)) | Err(_) => Err(status::Custom(
-                Status::InternalServerError,
-                "Failed to disable addon".to_owned(),
-            )),
+            Ok(()) => Ok(Json(AddonEnabledState { enabled: false })),
+            Err(e) => {
+                error!("Failed to disable addon: {:?}", e);
+                Err(status::Custom(
+                    Status::InternalServerError,
+                    "Failed to disable addon".to_owned(),
+                ))
+            }
         }
     }
 }

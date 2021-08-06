@@ -32,6 +32,7 @@ mod test {
     use serial_test::serial;
     use std::{env, fs};
 
+    #[allow(unused_must_use)]
     fn setup() {
         let dir = env::temp_dir().join(".webthingsio");
         fs::remove_dir_all(&dir); // We really don't want to handle this result, since we don't care if the directory never existed
