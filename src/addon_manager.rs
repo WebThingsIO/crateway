@@ -84,7 +84,7 @@ impl Handler<LoadAddons> for AddonManager {
                 .map(|(result, path)| {
                     result
                         .context(anyhow!("Failed to send load addon message for {:?}", path))?
-                        .context(anyhow!("Faild to load addon from {:?}", path))?;
+                        .context(anyhow!("Failed to load addon from {:?}", path))?;
                     info!("Loaded addon from {:?}", path);
                     Ok(())
                 })
