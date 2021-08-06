@@ -75,7 +75,9 @@ impl Handler<StartAddon> for ProcessManager {
 
         info!("Starting {}", id);
 
-        let path_str = &path.to_str().ok_or(anyhow!("Convert path to string"))?;
+        let path_str = &path
+            .to_str()
+            .ok_or_else(|| anyhow!("Convert path to string"))?;
         let exec_cmd = exec.replace("{name}", &id).replace("{path}", path_str);
         let args: Vec<_> = exec_cmd.split_ascii_whitespace().collect();
 
@@ -136,7 +138,7 @@ impl Handler<StopAddon> for ProcessManager {
         let abort_handle = self
             .processes
             .remove(&id)
-            .ok_or(anyhow!("Process for {} not running!", id))?;
+            .ok_or_else(|| anyhow!("Process for {} not running!", id))?;
         info!("Stopping {}", &id);
         abort_handle.abort();
         Ok(())

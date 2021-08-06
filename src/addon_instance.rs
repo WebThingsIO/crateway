@@ -111,6 +111,6 @@ impl AddonInstance {
     fn get_adapter_mut(&mut self, id: &str) -> Result<&mut Adapter, Error> {
         self.adapters
             .get_mut(id)
-            .ok_or(anyhow!("No adapter with id {} found", id))
+            .ok_or_else(|| anyhow!("No adapter with id {} found", id))
     }
 }

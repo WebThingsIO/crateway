@@ -181,7 +181,7 @@ impl Handler<EnableAddon> for AddonManager {
         let addon = try_fut!(self
             .installed_addons
             .get_mut(&id)
-            .ok_or(anyhow!("Package {} not installed", id)));
+            .ok_or_else(|| anyhow!("Package {} not installed", id)));
         if addon.enabled {
             bail_fut!("Addon {} already enabled!", id)
         }
@@ -211,7 +211,7 @@ impl Handler<DisableAddon> for AddonManager {
         let addon = try_fut!(self
             .installed_addons
             .get_mut(&id)
-            .ok_or(anyhow!("Package {} not installed", id)));
+            .ok_or_else(|| anyhow!("Package {} not installed", id)));
 
         if !addon.enabled {
             bail_fut!("Addon {} already disabled!", id)
