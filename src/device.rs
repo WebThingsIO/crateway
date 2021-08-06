@@ -11,28 +11,27 @@ pub struct Device {
 
 impl Device {
     pub(crate) fn update_property(&mut self, new_property: Property) -> Result<(), String> {
-        match new_property.name.clone() {
-            Some(name) => match &mut self.description.properties {
-                Some(properties) => match properties.get_mut(&name) {
-                    Some(property) => {
-                        if property.value != new_property.value {
-                            debug!(
-                                "Property {} of device {} changed from {:?} to {:?}",
-                                name, self.description.id, property.value, new_property.value
-                            );
-                        }
-                        properties.insert(name, new_property);
-                        Ok(())
-                    }
-                    None => Err(format!(
-                        "Device {} has no property called {}",
-                        self.description.id, name
-                    )),
-                },
-                None => Err(format!("Device {} has no properties", self.description.id)),
-            },
-            None => Err(String::from("Property has no name")),
+        let name = new_property
+            .name
+            .clone()
+            .ok_or(String::from("Property has no name"))?;
+        let mut properties = self
+            .description
+            .properties
+            .as_mut()
+            .ok_or(format!("Device {} has no properties", self.description.id))?;
+        let property = properties.get_mut(&name).ok_or(format!(
+            "Device {} has no property called {}",
+            self.description.id, name
+        ))?;
+        if property.value != new_property.value {
+            debug!(
+                "Property {} of device {} changed from {:?} to {:?}",
+                name, self.description.id, property.value, new_property.value
+            );
         }
+        properties.insert(name, new_property);
+        Ok(())
     }
 }
 
