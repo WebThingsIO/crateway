@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use crate::device::Device;
+use anyhow::{anyhow, Error};
 use std::collections::HashMap;
 use webthings_gateway_ipc_types::{Device as DeviceDescription, Property as PropertyDescription};
 
@@ -38,16 +39,13 @@ impl Adapter {
         &mut self,
         device_id: String,
         property: PropertyDescription,
-    ) -> Result<(), String> {
-        match self.devices.get_mut(&device_id) {
-            Some(device) => {
-                device.update_property(property)?;
-                Ok(())
-            }
-            None => Err(format!(
-                "Device {} does not exist in adapter {}",
-                device_id, self.id
-            )),
-        }
+    ) -> Result<(), Error> {
+        let device = self.devices.get_mut(&device_id).ok_or(anyhow!(
+            "Device {} does not exist in adapter {}",
+            device_id,
+            self.id
+        ))?;
+
+        device.update_property(property)
     }
 }
