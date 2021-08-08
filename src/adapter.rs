@@ -40,13 +40,16 @@ impl Adapter {
         device_id: String,
         property: PropertyDescription,
     ) -> Result<(), Error> {
-        let id = self.id.clone();
-
-        let device = self
-            .devices
-            .get_mut(&device_id)
-            .ok_or_else(|| anyhow!("Device {} does not exist in adapter {}", device_id, id))?;
+        let device = self.get_device(&device_id)?;
 
         device.update_property(property)
+    }
+
+    fn get_device(&mut self, device_id: &str) -> Result<&mut Device, Error> {
+        let id = self.id.clone();
+
+        self.devices
+            .get_mut(device_id)
+            .ok_or_else(|| anyhow!("Device {} does not exist in adapter {}", device_id, id))
     }
 }
