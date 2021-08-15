@@ -8,6 +8,7 @@ use webthings_gateway_ipc_types::{Device as DeviceDescription, Property};
 
 pub struct Device {
     description: DeviceDescription,
+    connected: bool,
 }
 
 impl Device {
@@ -35,10 +36,17 @@ impl Device {
         properties.insert(name, new_property);
         Ok(())
     }
+
+    pub fn set_connect_state(&mut self, state: bool) {
+        self.connected = state;
+    }
 }
 
 impl Device {
     pub fn new(description: DeviceDescription) -> Self {
-        Self { description }
+        Self {
+            description,
+            connected: true,
+        }
     }
 }

@@ -106,6 +106,10 @@ impl AddonInstance {
                 let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
                 adapter.update_property(msg.data.device_id, msg.data.property)?;
             }
+            Message::DeviceConnectedStateNotification(msg) => {
+                let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
+                adapter.set_connect_state(msg.data.device_id, msg.data.connected)?;
+            }
             _ => {}
         };
 
