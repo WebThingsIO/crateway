@@ -45,9 +45,14 @@ impl Adapter {
         device.update_property(property)
     }
 
+    pub fn set_connect_state(&mut self, device_id: String, state: bool) -> Result<(), Error> {
+        let device = self.get_device(&device_id)?;
+        device.set_connect_state(state);
+        Ok(())
+    }
+
     fn get_device(&mut self, device_id: &str) -> Result<&mut Device, Error> {
         let id = self.id.clone();
-
         self.devices
             .get_mut(device_id)
             .ok_or_else(|| anyhow!("Device {} does not exist in adapter {}", device_id, id))
