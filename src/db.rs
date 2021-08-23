@@ -3,28 +3,34 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::model::Thing;
-use crate::user_config;
-use anyhow::{anyhow, Context, Error};
+use crate::{model::Thing, user_config};
+use anyhow::{Context as AnyhowContext, Result};
 use rusqlite::{params, Connection, OptionalExtension};
-use std::{ops::Deref, sync::Mutex};
+use std::ops::Deref;
+use xactor::{message, Actor, Context, Handler, Service};
 
-pub struct Db(Mutex<Connection>);
+pub struct Db(Connection);
 
-impl Db {
-    pub fn new() -> Self {
+impl Actor for Db {}
+
+impl Service for Db {}
+
+impl Default for Db {
+    fn default() -> Self {
         let conn = Connection::open(user_config::CONFIG_DIR.join("db.sqlite3"))
             .expect("Open database file");
         create_tables(&conn);
-        Self(Mutex::new(conn))
+        Self(conn)
     }
+}
 
-    pub fn get_things(&self) -> Result<Vec<Thing>, Error> {
-        let conn = self
-            .lock()
-            .map_err(|e| anyhow!(e.to_string()))
-            .context("Lock connection")?;
-        let mut stmt = conn
+#[message(result = "Result<Vec<Thing>>")]
+pub struct GetThings;
+
+#[async_trait]
+impl Handler<GetThings> for Db {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, _msg: GetThings) -> Result<Vec<Thing>> {
+        let mut stmt = self
             .prepare("SELECT id, description FROM things")
             .context("Prepare statement")?;
         let mut rows = stmt.query([]).context("Execute query")?;
@@ -38,13 +44,19 @@ impl Db {
         }
         Ok(things)
     }
+}
 
-    pub fn get_thing(&self, id: &str) -> Result<Option<Thing>, Error> {
-        let conn = self
-            .lock()
-            .map_err(|e| anyhow!(e.to_string()))
-            .context("Lock connection")?;
-        let mut stmt = conn
+#[message(result = "Result<Option<Thing>>")]
+pub struct GetThing(pub String);
+
+#[async_trait]
+impl Handler<GetThing> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        GetThing(id): GetThing,
+    ) -> Result<Option<Thing>> {
+        let mut stmt = self
             .prepare("SELECT id, description FROM things WHERE id = ?")
             .context("Prepare statement")?;
         let row = stmt
@@ -66,16 +78,22 @@ impl Db {
             }
         }
     }
+}
 
-    pub fn create_thing(&self, id: &str, description: serde_json::Value) -> Result<Thing, Error> {
-        let thing = Thing::from_id_and_json(id, description)
+#[message(result = "Result<Thing>")]
+struct CreateThing(String, serde_json::Value);
+
+#[async_trait]
+impl Handler<CreateThing> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        CreateThing(id, description): CreateThing,
+    ) -> Result<Thing> {
+        let thing = Thing::from_id_and_json(&id, description)
             .context("Get thing from id and description")?;
         let description = serde_json::to_string(&thing).context("Stringify thing")?;
-        let conn = self
-            .lock()
-            .map_err(|e| anyhow!(e.to_string()))
-            .context("Lock connection")?;
-        conn.execute(
+        self.execute(
             "INSERT INTO things (id, description) VALUES (?, ?)",
             params![id, description],
         )
@@ -85,7 +103,7 @@ impl Db {
 }
 
 impl Deref for Db {
-    type Target = Mutex<Connection>;
+    type Target = Connection;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -111,6 +129,7 @@ mod tests {
     use rusty_fork::rusty_fork_test;
     use serial_test::serial;
     use std::{env, fs};
+    use tokio::runtime::Runtime;
 
     #[allow(unused_must_use)]
     fn setup() {
@@ -123,39 +142,70 @@ mod tests {
         #[test]
         #[serial]
         fn test_create_things() {
-            setup();
-            let db = Db::new();
-            db.create_thing("test1", serde_json::json!({})).unwrap();
-            db.create_thing("test2", serde_json::json!({})).unwrap();
-            let things = db.get_things().unwrap();
-            assert_eq!(things.len(), 2);
-            assert_eq!(
-                things[0],
-                Thing {
-                    id: "test1".to_owned()
-                }
-            );
-            assert_eq!(
-                things[1],
-                Thing {
-                    id: "test2".to_owned()
-                }
-            );
+            Runtime::new().unwrap().block_on(async {
+                setup();
+                Db::from_registry()
+                    .await.expect("Get db")
+                    .call(CreateThing("test1".to_owned(), serde_json::json!({})))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                Db::from_registry()
+                    .await.expect("Get db")
+                    .call(CreateThing("test2".to_owned(), serde_json::json!({})))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let things = Db::from_registry()
+                    .await
+                    .expect("Get db")
+                    .call(GetThings)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(things.len(), 2);
+                assert_eq!(
+                    things[0],
+                    Thing {
+                        id: "test1".to_owned()
+                    }
+                );
+                assert_eq!(
+                    things[1],
+                    Thing {
+                        id: "test2".to_owned()
+                    }
+                );
+            });
         }
 
         #[test]
         #[serial]
         fn test_get_thing() {
-            setup();
-            let db = Db::new();
-            db.create_thing("test", serde_json::json!({})).unwrap();
-            let thing = db.get_thing("test").unwrap().unwrap();
-            assert_eq!(
-                thing,
-                Thing {
-                    id: "test".to_owned()
-                }
-            );
+            Runtime::new().unwrap().block_on(async {
+                setup();
+                Db::from_registry()
+                    .await
+                    .expect("Get db")
+                    .call(CreateThing("test".to_owned(), serde_json::json!({})))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let thing = Db::from_registry()
+                    .await
+                    .expect("Get db")
+                    .call(GetThing("test".to_owned()))
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(
+                    thing,
+                    Thing {
+                        id: "test".to_owned()
+                    }
+                );
+            });
         }
     }
 }

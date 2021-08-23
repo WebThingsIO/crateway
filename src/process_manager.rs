@@ -3,8 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::user_config;
-use actix::{prelude::*, Actor, Context};
+use crate::{
+    addon_manager::{AddonManager, AddonStopped},
+    user_config,
+};
 use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
 use async_process::Command;
 use futures::{
@@ -13,6 +15,7 @@ use futures::{
 };
 use log::{debug, error, info, log, Level};
 use std::{collections::HashMap, path::PathBuf, process::Stdio};
+use xactor::{message, Actor, Context, Handler, Service};
 
 #[derive(Default)]
 pub struct ProcessManager {
@@ -22,10 +25,10 @@ pub struct ProcessManager {
 impl ProcessManager {
     fn print<T>(prefix: String, level: Level, stream: Option<T>)
     where
-        T: AsyncRead + Unpin + 'static,
+        T: AsyncRead + Unpin + Send + 'static,
     {
         if let Some(stream) = stream {
-            actix::spawn(async move {
+            tokio::spawn(async move {
                 let mut lines = BufReader::new(stream).lines();
 
                 while let Some(Ok(line)) = lines.next().await {
@@ -36,46 +39,27 @@ impl ProcessManager {
     }
 }
 
-impl Actor for ProcessManager {
-    type Context = Context<Self>;
+impl Actor for ProcessManager {}
 
-    fn started(&mut self, _ctx: &mut Context<Self>) {
-        info!("ProcessManager started");
-    }
+impl Service for ProcessManager {}
 
-    fn stopped(&mut self, _ctx: &mut Context<Self>) {
-        info!("ProcessManager stopped");
-    }
-}
+#[message(result = "Result<(), Error>")]
+pub struct StartAddon(pub String, pub PathBuf, pub String);
 
-impl actix::Supervised for ProcessManager {}
-
-impl SystemService for ProcessManager {
-    fn service_started(&mut self, _ctx: &mut Context<Self>) {
-        info!("ProcessManager service started");
-    }
-}
-
-#[derive(Message)]
-#[rtype(result = "Result<(), Error>")]
-pub struct StartAddon {
-    pub id: String,
-    pub path: PathBuf,
-    pub exec: String,
-}
-
+#[async_trait]
 impl Handler<StartAddon> for ProcessManager {
-    type Result = Result<(), Error>;
-
-    fn handle(&mut self, msg: StartAddon, _ctx: &mut Context<Self>) -> Self::Result {
-        let StartAddon { id, path, exec } = msg;
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        StartAddon(id, path, exec): StartAddon,
+    ) -> Result<(), Error> {
         if self.processes.contains_key(&id) {
             bail!("Process for {} already running", id)
         }
 
         info!("Starting {}", id);
 
-        let path_str = &path
+        let path_str = path
             .to_str()
             .ok_or_else(|| anyhow!("Convert path to string"))?;
         let exec_cmd = exec.replace("{name}", &id).replace("{path}", path_str);
@@ -103,10 +87,15 @@ impl Handler<StartAddon> for ProcessManager {
         Self::print(id.to_owned(), Level::Info, child.stdout.take());
         Self::print(id.to_owned(), Level::Error, child.stderr.take());
 
-        actix::spawn(async move {
+        tokio::spawn(async move {
             match Abortable::new(child.status(), abort_registration).await {
                 Ok(Ok(status)) => {
                     info!("Process of {} exited with code {}", id, status);
+                    AddonManager::from_registry()
+                        .await
+                        .expect("Get addon manager")
+                        .send(AddonStopped(id.clone()))
+                        .expect("Stop addon");
                 }
                 Ok(Err(err)) => {
                     error!("Failed to wait for process to terminate: {}", err);
@@ -116,6 +105,11 @@ impl Handler<StartAddon> for ProcessManager {
                     if let Err(err) = child.kill() {
                         error!("Could not kill process {} of {}: {}", child.id(), id, err)
                     }
+                    AddonManager::from_registry()
+                        .await
+                        .expect("Get addon manager")
+                        .send(AddonStopped(id.clone()))
+                        .expect("Stop addon");
                 }
             };
         });
@@ -124,17 +118,16 @@ impl Handler<StartAddon> for ProcessManager {
     }
 }
 
-#[derive(Message)]
-#[rtype(result = "Result<(), Error>")]
-pub struct StopAddon {
-    pub id: String,
-}
+#[message(result = "Result<(), Error>")]
+pub struct StopAddon(pub String);
 
+#[async_trait]
 impl Handler<StopAddon> for ProcessManager {
-    type Result = Result<(), Error>;
-
-    fn handle(&mut self, msg: StopAddon, _ctx: &mut Context<Self>) -> Self::Result {
-        let StopAddon { id } = msg;
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        StopAddon(id): StopAddon,
+    ) -> Result<(), Error> {
         let abort_handle = self
             .processes
             .remove(&id)

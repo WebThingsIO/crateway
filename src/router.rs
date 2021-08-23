@@ -5,25 +5,32 @@
 
 use crate::{
     addon_manager::{AddonManager, DisableAddon, EnableAddon},
-    db::Db,
+    db::{Db, GetThing, GetThings},
     model::Thing,
 };
-use actix::prelude::*;
 use anyhow::anyhow;
 use rocket::{
     http::Status,
     response::status,
     serde::{json::Json, Deserialize, Serialize},
-    Route, State,
+    Route,
 };
+use xactor::Service;
 
 pub fn routes() -> Vec<Route> {
     routes![get_things, get_thing, put_addon]
 }
 
 #[get("/things")]
-fn get_things(db: &State<Db>) -> Result<Json<Vec<Thing>>, status::Custom<&'static str>> {
-    match db.get_things() {
+async fn get_things() -> Result<Json<Vec<Thing>>, status::Custom<&'static str>> {
+    match Db::from_registry()
+        .await
+        .expect("Get db")
+        .call(GetThings)
+        .await
+        .map_err(|err| anyhow!(err))
+        .flatten()
+    {
         Err(e) => {
             error!("Error during db.get_things: {:?}", e);
             Err(status::Custom(Status::InternalServerError, "Err"))
@@ -33,11 +40,15 @@ fn get_things(db: &State<Db>) -> Result<Json<Vec<Thing>>, status::Custom<&'stati
 }
 
 #[get("/thing/<thing_id>")]
-fn get_thing(
-    db: &State<Db>,
-    thing_id: String,
-) -> Result<Option<Json<Thing>>, status::Custom<String>> {
-    match db.get_thing(&thing_id) {
+async fn get_thing(thing_id: String) -> Result<Option<Json<Thing>>, status::Custom<String>> {
+    match Db::from_registry()
+        .await
+        .expect("Get db")
+        .call(GetThing(thing_id.to_owned()))
+        .await
+        .map_err(|err| anyhow!(err))
+        .flatten()
+    {
         Err(e) => {
             error!("Error during db.get_things: {:?}", e);
             Err(status::Custom(
@@ -70,9 +81,11 @@ async fn put_addon(
 ) -> Result<Json<AddonEnabledState>, status::Custom<String>> {
     if data.0.enabled {
         match AddonManager::from_registry()
-            .send(EnableAddon(addon_id.to_owned()))
             .await
-            .map_err(|e| anyhow!(e))
+            .expect("Get addon manager")
+            .call(EnableAddon(addon_id))
+            .await
+            .map_err(|err| anyhow!(err))
             .flatten()
         {
             Ok(()) => Ok(Json(AddonEnabledState { enabled: true })),
@@ -86,9 +99,11 @@ async fn put_addon(
         }
     } else {
         match AddonManager::from_registry()
-            .send(DisableAddon(addon_id.to_owned()))
             .await
-            .map_err(|e| anyhow!(e))
+            .expect("Get addon manager")
+            .call(DisableAddon(addon_id))
+            .await
+            .map_err(|err| anyhow!(err))
             .flatten()
         {
             Ok(()) => Ok(Json(AddonEnabledState { enabled: false })),

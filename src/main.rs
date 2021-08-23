@@ -17,7 +17,6 @@ mod addon_manager;
 mod addon_socket;
 mod db;
 mod device;
-mod macros;
 mod model;
 mod process_manager;
 mod rest_api;
@@ -25,12 +24,12 @@ mod router;
 mod user_config;
 
 use crate::addon_manager::{AddonManager, LoadAddons};
-use actix::prelude::*;
 use anyhow::anyhow;
 use log::{info, LevelFilter};
 use simplelog::{ColorChoice, ConfigBuilder, TermLogger, TerminalMode};
+use xactor::Service;
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() {
     TermLogger::init(
         LevelFilter::Debug,
@@ -48,17 +47,17 @@ async fn main() {
 
     info!("Starting gateway");
 
-    actix::spawn(async {
+    tokio::spawn(async {
         addon_socket::start().await.expect("Starting addon socket");
     });
 
-    actix::spawn(async {
+    tokio::spawn(async {
         if let Err(e) = AddonManager::from_registry()
-            .send(LoadAddons {
-                addon_dir: user_config::ADDONS_DIR.clone(),
-            })
             .await
-            .map_err(|e| anyhow!(e))
+            .expect("Get addon manager")
+            .call(LoadAddons(user_config::ADDONS_DIR.clone()))
+            .await
+            .map_err(|err| anyhow!(err))
             .flatten()
         {
             error!("Failed load addons: {:?}", e);
