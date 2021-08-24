@@ -3,13 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::{db::Db, router};
+use crate::router;
 use rocket::{Build, Rocket};
 
 fn rocket() -> Rocket<Build> {
-    rocket::build()
-        .manage(Db::new())
-        .mount("/", router::routes())
+    rocket::build().mount("/", router::routes())
 }
 
 pub async fn launch() {

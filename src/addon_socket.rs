@@ -4,23 +4,56 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::addon_instance::AddonInstance;
-use actix_web::{web, App, Error as ActixError, HttpRequest, HttpResponse, HttpServer};
-use actix_web_actors::ws;
+use crate::addon_instance::Msg;
+use anyhow::anyhow;
 use anyhow::Error;
+use futures::StreamExt;
 use log::{debug, info};
+use std::net::SocketAddr;
+use tokio::net::{TcpListener, TcpStream};
+use tokio_tungstenite::tungstenite;
+use webthings_gateway_ipc_types::{Message, MessageBase};
+use xactor::Actor;
 
-async fn route(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, ActixError> {
-    debug!("Incoming websocket connection from {:?}", req.peer_addr());
-    ws::start(AddonInstance::new(), &req, stream)
+async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
+    debug!("Incoming websocket connection from {:?}", addr);
+    let ws_stream = tokio_tungstenite::accept_async(stream)
+        .await
+        .expect("Error during the websocket handshake occurred");
+    let (sink, mut stream) = ws_stream.split();
+    let addon_instance = AddonInstance::new(sink)
+        .start()
+        .await
+        .expect("Start addon instance");
+
+    while let Some(msg) = stream.next().await {
+        let msg = msg.expect("Receive message");
+        if let tungstenite::Message::Text(msg) = msg {
+            debug!("Received a message from {}: {}", addr, msg);
+            let msg = msg.parse::<Message>().unwrap();
+            let id = msg.plugin_id().to_owned();
+
+            if let Err(err) = addon_instance
+                .call(Msg(msg))
+                .await
+                .map_err(|err| anyhow!(err))
+                .flatten()
+            {
+                error!("Addon instance {:?} failed to handle message: {}", id, err);
+            }
+        } else {
+            warn!("Received unexpected message")
+        }
+    }
 }
 
 pub async fn start() -> Result<(), Error> {
     info!("Starting addon socket");
 
-    HttpServer::new(|| App::new().route("/", web::get().to(route)))
-        .bind("127.0.0.1:9500")?
-        .run()
-        .await?;
+    let listener = TcpListener::bind("127.0.0.1:9500").await?;
+    while let Ok((stream, addr)) = listener.accept().await {
+        tokio::spawn(handle_connection(stream, addr));
+    }
 
     Ok(())
 }
