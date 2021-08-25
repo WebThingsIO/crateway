@@ -136,8 +136,8 @@ struct UserCount {
 }
 
 #[get("/users/count")]
-async fn get_user_count() -> Result<Json<UserCount>, status::Custom<String>> {
-    Ok(Json(UserCount { count: 1 }))
+async fn get_user_count() -> Json<UserCount> {
+    Json(UserCount { count: 1 })
 }
 
 #[derive(Serialize, Deserialize)]
@@ -153,14 +153,14 @@ struct Language {
 }
 
 #[get("/settings/localization/language")]
-async fn get_language() -> Result<Json<CurrentLanguage>, status::Custom<String>> {
-    Ok(Json(CurrentLanguage {
+async fn get_language() -> Json<CurrentLanguage> {
+    Json(CurrentLanguage {
         current: String::from("en-US"),
         valid: vec![Language {
             code: String::from("en-US"),
             name: String::from("English (United States of America)"),
         }],
-    }))
+    })
 }
 
 #[derive(Serialize, Deserialize)]
@@ -169,10 +169,10 @@ struct Units {
 }
 
 #[get("/settings/localization/units")]
-async fn get_units() -> Result<Json<Units>, status::Custom<String>> {
-    Ok(Json(Units {
+async fn get_units() -> Json<Units> {
+    Json(Units {
         temperature: String::from("degree celsius"),
-    }))
+    })
 }
 
 #[derive(Serialize, Deserialize)]
@@ -184,12 +184,12 @@ struct CurrentTimezone {
 }
 
 #[get("/settings/localization/timezone")]
-async fn get_timezone() -> Result<Json<CurrentTimezone>, status::Custom<String>> {
-    Ok(Json(CurrentTimezone {
+async fn get_timezone() -> Json<CurrentTimezone> {
+    Json(CurrentTimezone {
         current: String::from("Europe/Berlin"),
         set_implemented: true,
         valid: vec![String::from("Europe/Berlin")],
-    }))
+    })
 }
 
 #[derive(Serialize, Deserialize)]
@@ -204,10 +204,10 @@ struct Jwt {
 }
 
 #[post("/login", data = "<data>")]
-async fn login(data: Json<Login>) -> Result<Json<Jwt>, status::Custom<String>> {
-    Ok(Json(Jwt {
+async fn login(data: Json<Login>) -> Json<Jwt> {
+    Json(Jwt {
         jwt: format!("{}:{}", data.email, data.password),
-    }))
+    })
 }
 
 #[get("/ping")]
@@ -216,6 +216,6 @@ async fn ping() -> Status {
 }
 
 #[get("/extensions")]
-async fn get_extensions() -> Result<Json<BTreeMap<String, String>>, status::Custom<String>> {
-    Ok(Json(BTreeMap::new()))
+async fn get_extensions() -> Json<BTreeMap<String, String>> {
+    Json(BTreeMap::new())
 }
