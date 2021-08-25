@@ -6,11 +6,24 @@
 use crate::router;
 use rocket::fs::{relative, FileServer};
 use rocket::{Build, Rocket};
+use std::env;
+use std::env::VarError;
 
 fn rocket() -> Rocket<Build> {
+    let ui_path = match env::var("WEBTHINGS_UI") {
+        Ok(value) => value,
+        Err(VarError::NotPresent) => relative!("gateway/build/static").to_owned(),
+        Err(VarError::NotUnicode(s)) => {
+            panic!(
+                "Environment variable WEBTHINGS_UI_DIR contains invalid characters: {:?}",
+                s
+            )
+        }
+    };
+
     rocket::build()
         .mount("/", router::routes())
-        .mount("/", FileServer::from(relative!("gateway/build/static")))
+        .mount("/", FileServer::from(ui_path))
 }
 
 pub async fn launch() {
@@ -38,6 +51,12 @@ mod test {
         let dir = env::temp_dir().join(".webthingsio");
         fs::remove_dir_all(&dir); // We really don't want to handle this result, since we don't care if the directory never existed
         env::set_var("WEBTHINGS_HOME", dir);
+
+        let ui_dir = env::temp_dir().join(".webthingsui");
+        fs::remove_dir_all(&ui_dir);
+        fs::create_dir(&ui_dir);
+        env::set_var("WEBTHINGS_UI", &ui_dir);
+        fs::write(ui_dir.join("index.html"), "foo");
     }
 
     rusty_fork_test! {
@@ -58,6 +77,16 @@ mod test {
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
             let response = client.get("/thing/test").dispatch();
             assert_eq!(response.status(), Status::NotFound);
+        }
+
+        #[test]
+        #[serial]
+        fn get_index() {
+            setup();
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+            let response = client.get("/").dispatch();
+            assert_eq!(response.status(), Status::Ok);
+            assert_eq!(response.into_string(), Some("foo".into()));
         }
     }
 }
