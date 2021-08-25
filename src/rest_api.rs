@@ -4,10 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::router;
+use rocket::fs::{relative, FileServer};
 use rocket::{Build, Rocket};
 
 fn rocket() -> Rocket<Build> {
-    rocket::build().mount("/", router::routes())
+    rocket::build()
+        .mount("/", router::routes())
+        .mount("/", FileServer::from(relative!("gateway/build/static")))
 }
 
 pub async fn launch() {
