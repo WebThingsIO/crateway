@@ -178,7 +178,7 @@ async fn get_units() -> Json<Units> {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CurrentTimezone {
     pub current: String,
-    #[serde(rename(serialize = "setImplemented"))]
+    #[serde(rename = "setImplemented")]
     pub set_implemented: bool,
     pub valid: Vec<String>,
 }
