@@ -41,6 +41,7 @@ mod test {
     extern crate rusty_fork;
     extern crate serial_test;
     use super::*;
+    use crate::router::{CurrentLanguage, CurrentTimezone, Jwt, Language, Login, Units};
     use rocket::{http::Status, local::blocking::Client};
     use rusty_fork::rusty_fork_test;
     use serial_test::serial;
@@ -87,6 +88,93 @@ mod test {
             let response = client.get("/").dispatch();
             assert_eq!(response.status(), Status::Ok);
             assert_eq!(response.into_string(), Some("foo".into()));
+        }
+
+        #[test]
+        #[serial]
+        fn get_language() {
+            setup();
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+            let response = client.get("/settings/localization/language").dispatch();
+            assert_eq!(response.status(), Status::Ok);
+
+            let expected = CurrentLanguage {
+                current: String::from("en-US"),
+                valid: vec![Language {
+                    code: String::from("en-US"),
+                    name: String::from("English (United States of America)"),
+                }],
+            };
+
+            assert_eq!(response.into_json::<CurrentLanguage>(), Some(expected));
+        }
+
+        #[test]
+        #[serial]
+        fn get_units() {
+            setup();
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+            let response = client.get("/settings/localization/units").dispatch();
+            assert_eq!(response.status(), Status::Ok);
+
+            let expected =  Units {
+                 temperature: String::from("degree celsius"),
+            };
+
+            assert_eq!(response.into_json::<Units>(), Some(expected));
+        }
+
+        #[test]
+        #[serial]
+        fn get_timezone() {
+            setup();
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+            let response = client.get("/settings/localization/timezone").dispatch();
+            assert_eq!(response.status(), Status::Ok);
+
+            let expected = CurrentTimezone {
+                current: String::from("Europe/Berlin"),
+                set_implemented: true,
+                valid: vec![String::from("Europe/Berlin")],
+            };
+
+            assert_eq!(response.into_json::<CurrentTimezone>(), Some(expected));
+        }
+
+        #[test]
+        #[serial]
+        fn login() {
+            setup();
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+            let email = String::from("foo@bar");
+            let password = String::from("42");
+            let jwt = format!("{}:{}", email, password);
+
+            let login = Login {
+                email,
+                password
+            };
+
+            let json = serde_json::to_string(&login).expect("Serialization of test data");
+            let response = client.post("/login").body(json).dispatch();
+
+            assert_eq!(response.status(), Status::Ok);
+
+            let expected = Jwt {
+                jwt,
+            };
+
+            assert_eq!(response.into_json::<Jwt>(), Some(expected));
+        }
+
+        #[test]
+        #[serial]
+        fn ping() {
+            setup();
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+            let response = client.get("/ping").dispatch();
+            assert_eq!(response.status(), Status::Ok);
+            assert_eq!(response.into_string(), None);
         }
     }
 }

@@ -140,16 +140,16 @@ async fn get_user_count() -> Json<UserCount> {
     Json(UserCount { count: 1 })
 }
 
-#[derive(Serialize, Deserialize)]
-struct CurrentLanguage {
-    current: String,
-    valid: Vec<Language>,
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct CurrentLanguage {
+    pub current: String,
+    pub valid: Vec<Language>,
 }
 
-#[derive(Serialize, Deserialize)]
-struct Language {
-    code: String,
-    name: String,
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Language {
+    pub code: String,
+    pub name: String,
 }
 
 #[get("/settings/localization/language")]
@@ -163,9 +163,9 @@ async fn get_language() -> Json<CurrentLanguage> {
     })
 }
 
-#[derive(Serialize, Deserialize)]
-struct Units {
-    temperature: String,
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Units {
+    pub temperature: String,
 }
 
 #[get("/settings/localization/units")]
@@ -175,12 +175,12 @@ async fn get_units() -> Json<Units> {
     })
 }
 
-#[derive(Serialize, Deserialize)]
-struct CurrentTimezone {
-    current: String,
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct CurrentTimezone {
+    pub current: String,
     #[serde(rename(serialize = "setImplemented"))]
-    set_implemented: bool,
-    valid: Vec<String>,
+    pub set_implemented: bool,
+    pub valid: Vec<String>,
 }
 
 #[get("/settings/localization/timezone")]
@@ -192,15 +192,15 @@ async fn get_timezone() -> Json<CurrentTimezone> {
     })
 }
 
-#[derive(Serialize, Deserialize)]
-struct Login {
-    email: String,
-    password: String,
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Login {
+    pub email: String,
+    pub password: String,
 }
 
-#[derive(Serialize, Deserialize)]
-struct Jwt {
-    jwt: String,
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Jwt {
+    pub jwt: String,
 }
 
 #[post("/login", data = "<data>")]
