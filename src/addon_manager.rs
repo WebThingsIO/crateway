@@ -8,10 +8,12 @@ use crate::{
     addon_instance::AddonInstance,
     db::{Db, GetSetting, SetSetting, SetSettingIfNotExists},
     process_manager::{ProcessManager, StartAddon, StopAddon},
+    user_config,
 };
 use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
 use log::{error, info};
 use rust_manifest_types::Manifest;
+use serde_json::json;
 use std::{collections::HashMap, fs, marker::PhantomData, path::PathBuf};
 use xactor::{message, Actor, Addr, Context, Handler, Service};
 
@@ -35,10 +37,16 @@ impl AddonManager {
         let path = addon.path.to_owned();
         let exec = addon.exec().to_owned();
         let enabled_key = format!("addons.{}.enabled", addon_id);
+        let config_key = format!("addons.{}.config", addon_id);
         Db::from_registry()
             .await
             .expect("Get db")
             .call(SetSettingIfNotExists(enabled_key.to_owned(), false))
+            .await??;
+        Db::from_registry()
+            .await
+            .expect("Get db")
+            .call(SetSettingIfNotExists(config_key.to_owned(), json!({})))
             .await??;
         let addon_enabled = Db::from_registry()
             .await
@@ -58,6 +66,24 @@ impl AddonManager {
             .context(anyhow!("Failed to start addon {}", addon_id))?
             .context(anyhow!("Failed to start addon {}", addon_id))?;
         Ok(())
+    }
+
+    async fn unload_addon(&mut self, id: String) -> Result<(), Error> {
+        ProcessManager::from_registry()
+            .await?
+            .call(StopAddon(id.clone()))
+            .await
+            .context(anyhow!("Failed to stop addon {}", id))?
+            .context(anyhow!("Failed to stop addon {}", id))?;
+        Ok(())
+    }
+
+    async fn addon_enabled(&mut self, id: String) -> Result<bool, Error> {
+        let addon = self
+            .installed_addons
+            .get(&id)
+            .ok_or_else(|| anyhow!("Package {} not installed", id))?;
+        Ok(addon.enabled)
     }
 }
 
@@ -93,6 +119,24 @@ impl Handler<LoadAddons> for AddonManager {
         }
         info!("Finished loading addons");
         res
+    }
+}
+
+#[message(result = "Result<(), Error>")]
+pub struct RestartAddon(pub String);
+
+#[async_trait]
+impl Handler<RestartAddon> for AddonManager {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        RestartAddon(id): RestartAddon,
+    ) -> Result<(), Error> {
+        self.unload_addon(id.to_owned()).await?;
+        if self.addon_enabled(id.to_owned()).await? {
+            self.load_addon(user_config::ADDONS_DIR.join(id)).await?;
+        }
+        Ok(())
     }
 }
 
@@ -174,12 +218,9 @@ impl Handler<DisableAddon> for AddonManager {
             .expect("Get db")
             .call(SetSetting(enabled_key, false))
             .await??;
-        ProcessManager::from_registry()
-            .await?
-            .call(StopAddon(id.clone()))
+        self.unload_addon(id.to_owned())
             .await
-            .context(anyhow!("Failed to stop addon {}", id))?
-            .context(anyhow!("Failed to stop addon {}", id))?;
+            .context(anyhow!("Failed to unload addon {}", id))?;
 
         Ok(())
     }
