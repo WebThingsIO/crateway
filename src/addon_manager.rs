@@ -34,7 +34,7 @@ impl AddonManager {
         let addon_id = addon.id().to_owned();
         let path = addon.path.to_owned();
         let exec = addon.exec().to_owned();
-        let enabled_key = format!("addons.{}", addon_id);
+        let enabled_key = format!("addons.{}.enabled", addon_id);
         Db::from_registry()
             .await
             .expect("Get db")
@@ -133,7 +133,7 @@ impl Handler<EnableAddon> for AddonManager {
         if addon.enabled {
             bail!("Addon {} already enabled!", id)
         }
-        let enabled_key = format!("addons.{}", id);
+        let enabled_key = format!("addons.{}.enabled", id);
         addon.enabled = true;
         Db::from_registry()
             .await
@@ -167,7 +167,7 @@ impl Handler<DisableAddon> for AddonManager {
         if !addon.enabled {
             bail!("Addon {} already disabled!", id)
         }
-        let enabled_key = format!("addons.{}", id);
+        let enabled_key = format!("addons.{}.enabled", id);
         addon.enabled = false;
         Db::from_registry()
             .await
