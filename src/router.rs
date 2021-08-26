@@ -15,10 +15,22 @@ use rocket::{
     serde::{json::Json, Deserialize, Serialize},
     Route,
 };
+use std::collections::BTreeMap;
 use xactor::Service;
 
 pub fn routes() -> Vec<Route> {
-    routes![get_things, get_thing, put_addon]
+    routes![
+        get_things,
+        get_thing,
+        put_addon,
+        get_user_count,
+        get_language,
+        get_units,
+        get_timezone,
+        login,
+        ping,
+        get_extensions
+    ]
 }
 
 #[get("/things")]
@@ -116,4 +128,94 @@ async fn put_addon(
             }
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct UserCount {
+    count: u32,
+}
+
+#[get("/users/count")]
+async fn get_user_count() -> Json<UserCount> {
+    Json(UserCount { count: 1 })
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct CurrentLanguage {
+    pub current: String,
+    pub valid: Vec<Language>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Language {
+    pub code: String,
+    pub name: String,
+}
+
+#[get("/settings/localization/language")]
+async fn get_language() -> Json<CurrentLanguage> {
+    Json(CurrentLanguage {
+        current: String::from("en-US"),
+        valid: vec![Language {
+            code: String::from("en-US"),
+            name: String::from("English (United States of America)"),
+        }],
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Units {
+    pub temperature: String,
+}
+
+#[get("/settings/localization/units")]
+async fn get_units() -> Json<Units> {
+    Json(Units {
+        temperature: String::from("degree celsius"),
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct CurrentTimezone {
+    pub current: String,
+    #[serde(rename = "setImplemented")]
+    pub set_implemented: bool,
+    pub valid: Vec<String>,
+}
+
+#[get("/settings/localization/timezone")]
+async fn get_timezone() -> Json<CurrentTimezone> {
+    Json(CurrentTimezone {
+        current: String::from("Europe/Berlin"),
+        set_implemented: true,
+        valid: vec![String::from("Europe/Berlin")],
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Login {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Jwt {
+    pub jwt: String,
+}
+
+#[post("/login", data = "<data>")]
+async fn login(data: Json<Login>) -> Json<Jwt> {
+    Json(Jwt {
+        jwt: format!("{}:{}", data.email, data.password),
+    })
+}
+
+#[get("/ping")]
+async fn ping() -> Status {
+    Status::Ok
+}
+
+#[get("/extensions")]
+async fn get_extensions() -> Json<BTreeMap<String, String>> {
+    Json(BTreeMap::new())
 }
