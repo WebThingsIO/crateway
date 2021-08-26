@@ -4,8 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::{
-    addon_manager::{AddonManager, DisableAddon, EnableAddon},
-    db::{Db, GetThing, GetThings},
+    addon_manager::{AddonManager, DisableAddon, EnableAddon, RestartAddon},
+    db::{Db, GetThing, GetThings, SetSetting},
     model::Thing,
 };
 use anyhow::anyhow;
@@ -23,6 +23,7 @@ pub fn routes() -> Vec<Route> {
         get_things,
         get_thing,
         put_addon,
+        put_addon_config,
         get_user_count,
         get_language,
         get_units,
@@ -218,4 +219,48 @@ async fn ping() -> Status {
 #[get("/extensions")]
 async fn get_extensions() -> Json<BTreeMap<String, String>> {
     Json(BTreeMap::new())
+}
+
+#[derive(Serialize, Deserialize)]
+struct AddonConfig {
+    config: serde_json::Value,
+}
+
+#[put("/addons/<addon_id>/config", data = "<data>")]
+async fn put_addon_config(
+    addon_id: String,
+    data: Json<AddonConfig>,
+) -> Result<Json<AddonConfig>, status::Custom<String>> {
+    let config_key = format!("addons.{}.config", addon_id);
+    if let Err(err) = Db::from_registry()
+        .await
+        .expect("Get db")
+        .call(SetSetting(config_key, data.0.config.clone()))
+        .await
+        .map_err(|err| anyhow!(err))
+        .flatten()
+    {
+        error!("Failed to update config for addon {}: {:?}", addon_id, err);
+        return Err(status::Custom(
+            Status::BadRequest,
+            format!("Failed to update config for addon {}", addon_id),
+        ));
+    }
+
+    if let Err(err) = AddonManager::from_registry()
+        .await
+        .expect("Get addon manager")
+        .call(RestartAddon(addon_id.to_owned()))
+        .await
+        .map_err(|err| anyhow!(err))
+        .flatten()
+    {
+        error!("Failed to restart addon {}: {:?}", addon_id, err);
+        return Err(status::Custom(
+            Status::BadRequest,
+            format!("Failed to restart addon {}", addon_id),
+        ));
+    }
+
+    Ok(Json(data.0))
 }
