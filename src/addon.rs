@@ -13,11 +13,11 @@ pub struct Addon {
 }
 
 impl Addon {
-    pub fn new(manifest: Manifest, path: PathBuf, enabled: bool) -> Self {
+    pub fn new(manifest: Manifest, path: PathBuf) -> Self {
         Self {
             manifest,
             path,
-            enabled,
+            enabled: false,
         }
     }
 
