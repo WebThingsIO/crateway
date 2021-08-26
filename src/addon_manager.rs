@@ -6,12 +6,13 @@
 use crate::{
     addon::Addon,
     addon_instance::AddonInstance,
+    db::{Db, GetSetting, SetSetting, SetSettingIfNotExists},
     process_manager::{ProcessManager, StartAddon, StopAddon},
 };
 use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
 use log::{error, info};
 use rust_manifest_types::Manifest;
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, marker::PhantomData, path::PathBuf};
 use xactor::{message, Actor, Addr, Context, Handler, Service};
 
 #[derive(Default)]
@@ -29,11 +30,22 @@ impl AddonManager {
         let manifest: Manifest =
             serde_json::from_reader(file).context(anyhow!("Could not read manifest.json"))?;
 
-        let addon = Addon::new(manifest, path, true);
+        let mut addon = Addon::new(manifest, path);
         let addon_id = addon.id().to_owned();
-        let addon_enabled = addon.enabled;
         let path = addon.path.to_owned();
         let exec = addon.exec().to_owned();
+        let enabled_key = format!("addons.{}", addon_id);
+        Db::from_registry()
+            .await
+            .expect("Get db")
+            .call(SetSettingIfNotExists(enabled_key.to_owned(), false))
+            .await??;
+        let addon_enabled = Db::from_registry()
+            .await
+            .expect("Get db")
+            .call(GetSetting::<bool>(enabled_key, PhantomData))
+            .await??;
+        addon.enabled = addon_enabled;
         self.installed_addons.insert(addon_id.to_owned(), addon);
         if !addon_enabled {
             bail!("Addon not enabled: {}", addon_id)
@@ -121,7 +133,13 @@ impl Handler<EnableAddon> for AddonManager {
         if addon.enabled {
             bail!("Addon {} already enabled!", id)
         }
+        let enabled_key = format!("addons.{}", id);
         addon.enabled = true;
+        Db::from_registry()
+            .await
+            .expect("Get db")
+            .call(SetSetting(enabled_key, true))
+            .await??;
         let path = addon.path.clone();
 
         self.load_addon(path)
@@ -149,7 +167,13 @@ impl Handler<DisableAddon> for AddonManager {
         if !addon.enabled {
             bail!("Addon {} already disabled!", id)
         }
+        let enabled_key = format!("addons.{}", id);
         addon.enabled = false;
+        Db::from_registry()
+            .await
+            .expect("Get db")
+            .call(SetSetting(enabled_key, false))
+            .await??;
         ProcessManager::from_registry()
             .await?
             .call(StopAddon(id.clone()))

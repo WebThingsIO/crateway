@@ -4,10 +4,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::{model::Thing, user_config};
-use anyhow::{Context as AnyhowContext, Result};
+use anyhow::{anyhow, Context as AnyhowContext, Result};
 use rusqlite::{params, Connection, OptionalExtension};
-use std::ops::Deref;
-use xactor::{message, Actor, Context, Handler, Service};
+use std::{fmt::Debug, marker::PhantomData, ops::Deref, str::FromStr};
+use xactor::{message, Actor, Context, Handler, Message, Service};
 
 pub struct Db(Connection);
 
@@ -102,6 +102,80 @@ impl Handler<CreateThing> for Db {
     }
 }
 
+pub struct SetSetting<T>(pub String, pub T);
+
+impl<T: Send + 'static> Message for SetSetting<T> {
+    type Result = Result<()>;
+}
+
+#[async_trait]
+impl<T: ToString + Send + 'static> Handler<SetSetting<T>> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        SetSetting(key, value): SetSetting<T>,
+    ) -> Result<()> {
+        self.execute(
+            "INSERT INTO settings (key, value) VALUES (?1, ?2) 
+                    ON CONFLICT(key) DO UPDATE SET value = ?2",
+            params![key, value.to_string()],
+        )
+        .context("Update database")?;
+        Ok(())
+    }
+}
+
+pub struct SetSettingIfNotExists<T>(pub String, pub T);
+
+impl<T: Send + 'static> Message for SetSettingIfNotExists<T> {
+    type Result = Result<()>;
+}
+
+#[async_trait]
+impl<T: ToString + Send + 'static> Handler<SetSettingIfNotExists<T>> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        SetSettingIfNotExists(key, value): SetSettingIfNotExists<T>,
+    ) -> Result<()> {
+        self.execute(
+            "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
+            params![key, value.to_string()],
+        )
+        .context("Update database")?;
+        Ok(())
+    }
+}
+
+pub struct GetSetting<T>(pub String, pub PhantomData<T>);
+
+impl<T: Send + 'static> Message for GetSetting<T> {
+    type Result = Result<T>;
+}
+
+#[async_trait]
+impl<T: FromStr + Send + 'static> Handler<GetSetting<T>> for Db
+where
+    <T as FromStr>::Err: Debug,
+{
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        GetSetting(key, _): GetSetting<T>,
+    ) -> Result<T> {
+        let mut stmt = self
+            .prepare("SELECT value FROM settings WHERE key = ?")
+            .context("Prepare statement")?;
+        let row = stmt
+            .query_row(params![key], |row| -> Result<String, rusqlite::Error> {
+                row.get(0)
+            })
+            .context("Query database")?;
+        Ok(FromStr::from_str(&row)
+            .map_err(|err: <T as FromStr>::Err| anyhow!(format!("{:?}", err)))?)
+    }
+}
+
 impl Deref for Db {
     type Target = Connection;
 
@@ -119,6 +193,15 @@ fn create_tables(conn: &Connection) {
         [],
     )
     .expect("Create table things");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS settings(
+                  key TEXT PRIMARY KEY,
+                  value TEXT
+                  )",
+        [],
+    )
+    .expect("Create table settings");
 }
 
 #[cfg(test)]
