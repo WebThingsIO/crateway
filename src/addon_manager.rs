@@ -195,3 +195,42 @@ impl Handler<DisableAddon> for AddonManager {
         Ok(())
     }
 }
+
+#[message(result = "Result<HashMap<String, Addon>, Error>")]
+pub struct GetAddons;
+
+#[async_trait]
+impl Handler<GetAddons> for AddonManager {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        _msg: GetAddons,
+    ) -> Result<HashMap<String, Addon>, Error> {
+        Ok(self.installed_addons.clone())
+    }
+}
+
+#[message(result = "Result<(), Error>")]
+pub struct UninstallAddon(pub String);
+
+#[async_trait]
+impl Handler<UninstallAddon> for AddonManager {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        UninstallAddon(addon_id): UninstallAddon,
+    ) -> Result<(), Error> {
+        if let Err(err) = self.unload_addon(addon_id.to_owned()).await {
+            error!("Failed to unload {} properly: {:?}", addon_id, err);
+        }
+        let addon_path = user_config::ADDONS_DIR.join(addon_id.to_owned());
+        if addon_path.exists() && addon_path.is_dir() {
+            fs::remove_dir_all(addon_path).context(format!("Error removing {}", addon_id))?;
+        }
+        let enabled_key = format!("addons.{}.enabled", addon_id);
+        call!(Db.SetSetting(enabled_key, false))
+            .context(format!("Failed to disable {}", addon_id))?;
+        self.installed_addons.remove(&addon_id);
+        Ok(())
+    }
+}

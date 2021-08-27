@@ -4,18 +4,23 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::{
-    addon_manager::{AddonManager, DisableAddon, EnableAddon, RestartAddon},
-    db::{Db, GetThing, GetThings, SetSetting},
+    addon_manager::{
+        AddonManager, DisableAddon, EnableAddon, GetAddons, RestartAddon, UninstallAddon,
+    },
+    db::{Db, GetSetting, GetThing, GetThings, SetSetting},
     macros::{call, ToRocket},
     model::Thing,
+    user_config,
 };
+use regex::Regex;
 use rocket::{
     http::Status,
     response::status,
     serde::{json::Json, Deserialize, Serialize},
     Route,
 };
-use std::collections::BTreeMap;
+use rust_manifest_types::Manifest;
+use std::{collections::BTreeMap, ffi::OsStr, fs, marker::PhantomData};
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -23,6 +28,10 @@ pub fn routes() -> Vec<Route> {
         get_thing,
         put_addon,
         put_addon_config,
+        get_addons,
+        get_addon_config,
+        get_addon_license,
+        delete_addon,
         get_user_count,
         get_language,
         get_units,
@@ -187,4 +196,67 @@ async fn put_addon_config(
         Status::BadRequest,
     )?;
     Ok(Json(data.0))
+}
+
+#[get("/addons")]
+async fn get_addons() -> Result<Json<Vec<Manifest>>, status::Custom<String>> {
+    let addons =
+        call!(AddonManager.GetAddons).to_rocket("Failed to get addons", Status::BadRequest)?;
+    Ok(Json(
+        addons
+            .values()
+            .cloned()
+            .map(|addon| addon.manifest)
+            .collect(),
+    ))
+}
+
+#[get("/addons/<addon_id>/config")]
+async fn get_addon_config(
+    addon_id: String,
+) -> Result<Json<serde_json::Value>, status::Custom<String>> {
+    let config_key = format!("addons.{}.config", addon_id);
+    let config = call!(Db.GetSetting(config_key, PhantomData))
+        .to_rocket("Failed to get addon config", Status::BadRequest)?;
+    Ok(Json(config))
+}
+
+#[get("/addons/<addon_id>/license")]
+async fn get_addon_license(addon_id: String) -> Result<String, status::Custom<String>> {
+    let addon_dir = user_config::ADDONS_DIR.join(addon_id.to_owned());
+    let entries = fs::read_dir(addon_dir.to_owned()).to_rocket(
+        "Failed to obtain license: Failed to access addon directory",
+        Status::BadRequest,
+    )?;
+    let files: Vec<_> = entries
+        .filter_map(|res| res.ok())
+        .map(|entry| entry.path())
+        .filter(|entry| entry.is_file())
+        .filter(|file| {
+            let name = file
+                .file_name()
+                .unwrap_or(OsStr::new(""))
+                .to_str()
+                .unwrap_or("");
+            let re = Regex::new(r"^LICENSE(\..*)?$").unwrap();
+            re.is_match(name)
+        })
+        .collect();
+    if files.len() == 0 {
+        return Err(status::Custom(
+            Status::BadRequest,
+            "License not found".to_owned(),
+        ));
+    }
+    fs::read_to_string(files[0].to_owned()).to_rocket(
+        format!("Failed to read license file for addon {}", addon_id),
+        Status::BadRequest,
+    )
+}
+
+#[delete("/addons/<addon_id>")]
+async fn delete_addon(addon_id: String) -> Result<status::NoContent, status::Custom<String>> {
+    call!(AddonManager.UninstallAddon(addon_id.to_owned()))
+        .to_rocket("Failed to uninstall add-on", Status::BadRequest)?;
+    Ok(status::NoContent)
 }

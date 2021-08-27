@@ -6,6 +6,7 @@
 use rust_manifest_types::Manifest;
 use std::path::PathBuf;
 
+#[derive(Clone)]
 pub struct Addon {
     pub manifest: Manifest,
     pub path: PathBuf,
