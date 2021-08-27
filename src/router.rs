@@ -224,7 +224,7 @@ async fn get_addon_config(
 #[get("/addons/<addon_id>/license")]
 async fn get_addon_license(addon_id: String) -> Result<String, status::Custom<String>> {
     let addon_dir = user_config::ADDONS_DIR.join(addon_id.to_owned());
-    let entries = fs::read_dir(addon_dir.to_owned()).to_rocket(
+    let entries = fs::read_dir(addon_dir).to_rocket(
         "Failed to obtain license: Failed to access addon directory",
         Status::BadRequest,
     )?;
@@ -235,14 +235,14 @@ async fn get_addon_license(addon_id: String) -> Result<String, status::Custom<St
         .filter(|file| {
             let name = file
                 .file_name()
-                .unwrap_or(OsStr::new(""))
+                .unwrap_or_else(|| OsStr::new(""))
                 .to_str()
                 .unwrap_or("");
             let re = Regex::new(r"^LICENSE(\..*)?$").unwrap();
             re.is_match(name)
         })
         .collect();
-    if files.len() == 0 {
+    if files.is_empty() {
         return Err(status::Custom(
             Status::BadRequest,
             "License not found".to_owned(),
