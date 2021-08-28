@@ -1,3 +1,6 @@
+use rocket::response::status;
+use std::fmt::Debug;
+
 macro_rules! call {
     ($receiver:ident.$msg:expr) => {
         match <$receiver as xactor::Service>::from_registry().await {
@@ -24,19 +27,31 @@ macro_rules! send {
 
 pub(crate) use send;
 
-macro_rules! rocket_try {
-    ($res:expr, $msg:expr, $stat:ident $(,)*) => {
-        match $res {
-            Ok(ok) => ok,
-            Err(err) => {
-                error!("{}", format!("{}: {:?}", $msg, err));
-                return Err(rocket::response::status::Custom(
-                    rocket::http::Status::$stat,
-                    $msg.to_string(),
-                ));
-            }
-        }
-    };
+pub trait ToRocket {
+    type O;
+    fn to_rocket<S: ToString>(
+        self,
+        message: S,
+        status: rocket::http::Status,
+    ) -> Result<Self::O, rocket::response::status::Custom<String>>;
 }
 
-pub(crate) use rocket_try;
+impl<O, E> ToRocket for Result<O, E>
+where
+    E: Debug,
+{
+    type O = O;
+    fn to_rocket<S: ToString>(
+        self,
+        message: S,
+        status: rocket::http::Status,
+    ) -> Result<Self::O, rocket::response::status::Custom<String>> {
+        match self {
+            Ok(ok) => Ok(ok),
+            Err(err) => {
+                error!("{}", format!("{}: {:?}", message.to_string(), err));
+                return Err(status::Custom(status, message.to_string()));
+            }
+        }
+    }
+}
