@@ -6,9 +6,9 @@
 use crate::{
     addon_manager::{AddonManager, DisableAddon, EnableAddon, RestartAddon},
     db::{Db, GetThing, GetThings, SetSetting},
+    macros::call,
     model::Thing,
 };
-use anyhow::anyhow;
 use rocket::{
     http::Status,
     response::status,
@@ -16,7 +16,6 @@ use rocket::{
     Route,
 };
 use std::collections::BTreeMap;
-use xactor::Service;
 
 pub fn routes() -> Vec<Route> {
     routes![
@@ -36,14 +35,7 @@ pub fn routes() -> Vec<Route> {
 
 #[get("/things")]
 async fn get_things() -> Result<Json<Vec<Thing>>, status::Custom<&'static str>> {
-    match Db::from_registry()
-        .await
-        .expect("Get db")
-        .call(GetThings)
-        .await
-        .map_err(|err| anyhow!(err))
-        .flatten()
-    {
+    match call!(Db.GetThings) {
         Err(e) => {
             error!("Error during db.get_things: {:?}", e);
             Err(status::Custom(Status::InternalServerError, "Err"))
@@ -54,14 +46,7 @@ async fn get_things() -> Result<Json<Vec<Thing>>, status::Custom<&'static str>> 
 
 #[get("/thing/<thing_id>")]
 async fn get_thing(thing_id: String) -> Result<Option<Json<Thing>>, status::Custom<String>> {
-    match Db::from_registry()
-        .await
-        .expect("Get db")
-        .call(GetThing(thing_id.to_owned()))
-        .await
-        .map_err(|err| anyhow!(err))
-        .flatten()
-    {
+    match call!(Db.GetThing(thing_id.to_owned())) {
         Err(e) => {
             error!("Error during db.get_things: {:?}", e);
             Err(status::Custom(
@@ -93,14 +78,7 @@ async fn put_addon(
     data: Json<AddonEnabledState>,
 ) -> Result<Json<AddonEnabledState>, status::Custom<String>> {
     if data.0.enabled {
-        match AddonManager::from_registry()
-            .await
-            .expect("Get addon manager")
-            .call(EnableAddon(addon_id))
-            .await
-            .map_err(|err| anyhow!(err))
-            .flatten()
-        {
+        match call!(AddonManager.EnableAddon(addon_id)) {
             Ok(()) => Ok(Json(AddonEnabledState { enabled: true })),
             Err(e) => {
                 error!("Failed to enable addon: {:?}", e);
@@ -111,14 +89,7 @@ async fn put_addon(
             }
         }
     } else {
-        match AddonManager::from_registry()
-            .await
-            .expect("Get addon manager")
-            .call(DisableAddon(addon_id))
-            .await
-            .map_err(|err| anyhow!(err))
-            .flatten()
-        {
+        match call!(AddonManager.DisableAddon(addon_id)) {
             Ok(()) => Ok(Json(AddonEnabledState { enabled: false })),
             Err(e) => {
                 error!("Failed to disable addon: {:?}", e);
@@ -232,14 +203,7 @@ async fn put_addon_config(
     data: Json<AddonConfig>,
 ) -> Result<Json<AddonConfig>, status::Custom<String>> {
     let config_key = format!("addons.{}.config", addon_id);
-    if let Err(err) = Db::from_registry()
-        .await
-        .expect("Get db")
-        .call(SetSetting(config_key, data.0.config.clone()))
-        .await
-        .map_err(|err| anyhow!(err))
-        .flatten()
-    {
+    if let Err(err) = call!(Db.SetSetting(config_key, data.0.config.clone())) {
         error!("Failed to update config for addon {}: {:?}", addon_id, err);
         return Err(status::Custom(
             Status::BadRequest,
@@ -247,14 +211,7 @@ async fn put_addon_config(
         ));
     }
 
-    if let Err(err) = AddonManager::from_registry()
-        .await
-        .expect("Get addon manager")
-        .call(RestartAddon(addon_id.to_owned()))
-        .await
-        .map_err(|err| anyhow!(err))
-        .flatten()
-    {
+    if let Err(err) = call!(AddonManager.RestartAddon(addon_id.to_owned())) {
         error!("Failed to restart addon {}: {:?}", addon_id, err);
         return Err(status::Custom(
             Status::BadRequest,

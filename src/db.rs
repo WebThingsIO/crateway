@@ -208,6 +208,8 @@ fn create_tables(conn: &Connection) {
 mod tests {
     extern crate rusty_fork;
     extern crate serial_test;
+    use crate::macros::call;
+
     use super::*;
     use rusty_fork::rusty_fork_test;
     use serial_test::serial;
@@ -227,25 +229,9 @@ mod tests {
         fn test_create_things() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                Db::from_registry()
-                    .await.expect("Get db")
-                    .call(CreateThing("test1".to_owned(), serde_json::json!({})))
-                    .await
-                    .unwrap()
-                    .unwrap();
-                Db::from_registry()
-                    .await.expect("Get db")
-                    .call(CreateThing("test2".to_owned(), serde_json::json!({})))
-                    .await
-                    .unwrap()
-                    .unwrap();
-                let things = Db::from_registry()
-                    .await
-                    .expect("Get db")
-                    .call(GetThings)
-                    .await
-                    .unwrap()
-                    .unwrap();
+                call!(Db.CreateThing("test1".to_owned(), serde_json::json!({}))).unwrap();
+                call!(Db.CreateThing("test2".to_owned(), serde_json::json!({}))).unwrap();
+                let things = call!(Db.GetThings).unwrap();
                 assert_eq!(things.len(), 2);
                 assert_eq!(
                     things[0],
@@ -267,26 +253,13 @@ mod tests {
         fn test_get_thing() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                Db::from_registry()
-                    .await
-                    .expect("Get db")
-                    .call(CreateThing("test".to_owned(), serde_json::json!({})))
-                    .await
-                    .unwrap()
-                    .unwrap();
-                let thing = Db::from_registry()
-                    .await
-                    .expect("Get db")
-                    .call(GetThing("test".to_owned()))
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .unwrap();
+                call!(Db.CreateThing("test".to_owned(), serde_json::json!({}))).unwrap();
+                let thing = call!(Db.GetThing("test".to_owned())).unwrap();
                 assert_eq!(
                     thing,
-                    Thing {
+                    Some(Thing {
                         id: "test".to_owned()
-                    }
+                    })
                 );
             });
         }

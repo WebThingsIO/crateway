@@ -7,6 +7,7 @@ use crate::{
     addon::Addon,
     addon_instance::AddonInstance,
     db::{Db, GetSetting, SetSetting, SetSettingIfNotExists},
+    macros::call,
     process_manager::{ProcessManager, StartAddon, StopAddon},
     user_config,
 };
@@ -38,44 +39,21 @@ impl AddonManager {
         let exec = addon.exec().to_owned();
         let enabled_key = format!("addons.{}.enabled", addon_id);
         let config_key = format!("addons.{}.config", addon_id);
-        Db::from_registry()
-            .await
-            .expect("Get db")
-            .call(SetSettingIfNotExists(enabled_key.to_owned(), false))
-            .await??;
-        Db::from_registry()
-            .await
-            .expect("Get db")
-            .call(SetSettingIfNotExists(config_key.to_owned(), json!({})))
-            .await??;
-        let addon_enabled = Db::from_registry()
-            .await
-            .expect("Get db")
-            .call(GetSetting::<bool>(enabled_key, PhantomData))
-            .await??;
+        call!(Db.SetSettingIfNotExists(enabled_key.to_owned(), false))?;
+        call!(Db.SetSettingIfNotExists(config_key.to_owned(), json!({})))?;
+        let addon_enabled = call!(Db.GetSetting::<bool>(enabled_key, PhantomData))?;
         addon.enabled = addon_enabled;
         self.installed_addons.insert(addon_id.to_owned(), addon);
         if !addon_enabled {
             bail!("Addon not enabled: {}", addon_id)
         }
         info!("Loading add-on {}", addon_id);
-        ProcessManager::from_registry()
-            .await?
-            .call(StartAddon(addon_id.to_owned(), path, exec))
-            .await
-            .context(anyhow!("Failed to start addon {}", addon_id))?
-            .context(anyhow!("Failed to start addon {}", addon_id))?;
+        call!(ProcessManager.StartAddon(addon_id.to_owned(), path, exec))?;
         Ok(())
     }
 
     async fn unload_addon(&mut self, id: String) -> Result<(), Error> {
-        ProcessManager::from_registry()
-            .await?
-            .call(StopAddon(id.clone()))
-            .await
-            .context(anyhow!("Failed to stop addon {}", id))?
-            .context(anyhow!("Failed to stop addon {}", id))?;
-        Ok(())
+        call!(ProcessManager.StopAddon(id.clone()))
     }
 
     async fn addon_enabled(&mut self, id: String) -> Result<bool, Error> {
@@ -179,11 +157,7 @@ impl Handler<EnableAddon> for AddonManager {
         }
         let enabled_key = format!("addons.{}.enabled", id);
         addon.enabled = true;
-        Db::from_registry()
-            .await
-            .expect("Get db")
-            .call(SetSetting(enabled_key, true))
-            .await??;
+        call!(Db.SetSetting(enabled_key, true))?;
         let path = addon.path.clone();
 
         self.load_addon(path)
@@ -213,11 +187,7 @@ impl Handler<DisableAddon> for AddonManager {
         }
         let enabled_key = format!("addons.{}.enabled", id);
         addon.enabled = false;
-        Db::from_registry()
-            .await
-            .expect("Get db")
-            .call(SetSetting(enabled_key, false))
-            .await??;
+        call!(Db.SetSetting(enabled_key, false))?;
         self.unload_addon(id.to_owned())
             .await
             .context(anyhow!("Failed to unload addon {}", id))?;

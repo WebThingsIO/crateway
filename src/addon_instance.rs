@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::addon_manager::AddonManager;
+use crate::macros::send;
 use crate::{adapter::Adapter, addon_manager::AddonStarted};
 use anyhow::{anyhow, Error};
 use futures::{stream::SplitSink, SinkExt};
@@ -14,7 +15,7 @@ use tokio_tungstenite::{tungstenite, WebSocketStream};
 use webthings_gateway_ipc_types::{
     Message, MessageBase, PluginRegisterResponseMessageData, Preferences, Units, UserProfile,
 };
-use xactor::{message, Actor, Context, Handler, Service};
+use xactor::{message, Actor, Context, Handler};
 
 pub struct AddonInstance {
     adapters: HashMap<String, Adapter>,
@@ -52,9 +53,7 @@ impl Handler<Msg> for AddonInstance {
             Message::PluginRegisterRequest(msg) => {
                 let id = msg.plugin_id();
 
-                AddonManager::from_registry()
-                    .await?
-                    .send(AddonStarted(id.to_owned(), ctx.address()))?;
+                send!(AddonManager.AddonStarted(id.to_owned(), ctx.address()))?;
 
                 let response: Message = PluginRegisterResponseMessageData {
                     gateway_version: env!("CARGO_PKG_VERSION").to_owned(),
