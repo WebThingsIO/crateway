@@ -7,10 +7,11 @@ use crate::{
     addon_manager::{
         AddonManager, DisableAddon, EnableAddon, GetAddons, RestartAddon, UninstallAddon,
     },
+    config::CONFIG,
     db::{Db, GetSetting, GetThing, GetThings, SetSetting},
     macros::{call, ToRocket},
     model::Thing,
-    user_config,
+    platform, user_config,
 };
 use regex::Regex;
 use rocket::{
@@ -20,6 +21,7 @@ use rocket::{
     Route,
 };
 use rust_manifest_types::Manifest;
+use serde_json::json;
 use std::{collections::BTreeMap, ffi::OsStr, fs, marker::PhantomData};
 
 pub fn routes() -> Vec<Route> {
@@ -31,6 +33,7 @@ pub fn routes() -> Vec<Route> {
         get_addons,
         get_addon_config,
         get_addon_license,
+        get_settings_addons_info,
         delete_addon,
         get_user_count,
         get_language,
@@ -259,4 +262,15 @@ async fn delete_addon(addon_id: String) -> Result<status::NoContent, status::Cus
     call!(AddonManager.UninstallAddon(addon_id.to_owned()))
         .to_rocket("Failed to uninstall add-on", Status::BadRequest)?;
     Ok(status::NoContent)
+}
+
+#[get("/settings/addonsInfo")]
+async fn get_settings_addons_info() -> Result<Json<serde_json::Value>, status::Custom<String>> {
+    Ok(Json(json!({
+        "urls": CONFIG.addon_manager.list_urls,
+        "architecture": platform::ARCHITECTURE.to_owned(),
+        "version": env!("CARGO_PKG_VERSION"),
+        "nodeVersion": platform::NODE_VERSION.to_owned(),
+        "pythonVersions": platform::PYTHON_VERSIONS.to_owned(),
+    })))
 }
