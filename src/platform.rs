@@ -24,7 +24,7 @@ lazy_static! {
             re.find(&out).map(|v| v.as_str().to_owned())
         };
         let mut versions: HashSet<String> = HashSet::new();
-        for bin in vec!["python", "python2", "python3"] {
+        for bin in &["python", "python2", "python3"] {
             if let Ok(out) = Command::new(bin).args(vec!["--version"]).output() {
                 if out.status.success() {
                     if let Some(version) = parse(format!(
