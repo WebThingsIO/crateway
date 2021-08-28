@@ -6,7 +6,7 @@
 use crate::{
     addon_manager::{AddonManager, DisableAddon, EnableAddon, RestartAddon},
     db::{Db, GetThing, GetThings, SetSetting},
-    macros::call,
+    macros::{call, rocket_try},
     model::Thing,
 };
 use rocket::{
@@ -34,36 +34,29 @@ pub fn routes() -> Vec<Route> {
 }
 
 #[get("/things")]
-async fn get_things() -> Result<Json<Vec<Thing>>, status::Custom<&'static str>> {
-    match call!(Db.GetThings) {
-        Err(e) => {
-            error!("Error during db.get_things: {:?}", e);
-            Err(status::Custom(Status::InternalServerError, "Err"))
-        }
-        Ok(t) => Ok(Json(t)),
-    }
+async fn get_things() -> Result<Json<Vec<Thing>>, status::Custom<String>> {
+    let t = rocket_try!(
+        call!(Db.GetThings),
+        "Error during db.get_things",
+        InternalServerError,
+    );
+    Ok(Json(t))
 }
 
 #[get("/thing/<thing_id>")]
 async fn get_thing(thing_id: String) -> Result<Option<Json<Thing>>, status::Custom<String>> {
-    match call!(Db.GetThing(thing_id.to_owned())) {
-        Err(e) => {
-            error!("Error during db.get_things: {:?}", e);
-            Err(status::Custom(
-                Status::InternalServerError,
-                "Err".to_owned(),
-            ))
-        }
-        Ok(t) => {
-            if let Some(t) = t {
-                Ok(Some(Json(t)))
-            } else {
-                Err(status::Custom(
-                    Status::NotFound,
-                    format!("Unable to find thing with title = {}", thing_id),
-                ))
-            }
-        }
+    let t = rocket_try!(
+        call!(Db.GetThing(thing_id.to_owned())),
+        "Error during db.get_thing",
+        InternalServerError,
+    );
+    if let Some(t) = t {
+        Ok(Some(Json(t)))
+    } else {
+        Err(status::Custom(
+            Status::NotFound,
+            format!("Unable to find thing with title = {}", thing_id),
+        ))
     }
 }
 
@@ -78,28 +71,21 @@ async fn put_addon(
     data: Json<AddonEnabledState>,
 ) -> Result<Json<AddonEnabledState>, status::Custom<String>> {
     if data.0.enabled {
-        match call!(AddonManager.EnableAddon(addon_id)) {
-            Ok(()) => Ok(Json(AddonEnabledState { enabled: true })),
-            Err(e) => {
-                error!("Failed to enable addon: {:?}", e);
-                Err(status::Custom(
-                    Status::InternalServerError,
-                    "Failed to enable addon".to_owned(),
-                ))
-            }
-        }
+        rocket_try!(
+            call!(AddonManager.EnableAddon(addon_id)),
+            "Failed to enable addon",
+            InternalServerError,
+        );
     } else {
-        match call!(AddonManager.DisableAddon(addon_id)) {
-            Ok(()) => Ok(Json(AddonEnabledState { enabled: false })),
-            Err(e) => {
-                error!("Failed to disable addon: {:?}", e);
-                Err(status::Custom(
-                    Status::InternalServerError,
-                    "Failed to disable addon".to_owned(),
-                ))
-            }
-        }
+        rocket_try!(
+            call!(AddonManager.DisableAddon(addon_id)),
+            "Failed to disable addon",
+            InternalServerError,
+        );
     }
+    Ok(Json(AddonEnabledState {
+        enabled: data.0.enabled,
+    }))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -203,21 +189,15 @@ async fn put_addon_config(
     data: Json<AddonConfig>,
 ) -> Result<Json<AddonConfig>, status::Custom<String>> {
     let config_key = format!("addons.{}.config", addon_id);
-    if let Err(err) = call!(Db.SetSetting(config_key, data.0.config.clone())) {
-        error!("Failed to update config for addon {}: {:?}", addon_id, err);
-        return Err(status::Custom(
-            Status::BadRequest,
-            format!("Failed to update config for addon {}", addon_id),
-        ));
-    }
-
-    if let Err(err) = call!(AddonManager.RestartAddon(addon_id.to_owned())) {
-        error!("Failed to restart addon {}: {:?}", addon_id, err);
-        return Err(status::Custom(
-            Status::BadRequest,
-            format!("Failed to restart addon {}", addon_id),
-        ));
-    }
-
+    rocket_try!(
+        call!(Db.SetSetting(config_key, data.0.config.clone())),
+        format!("Failed to update config for addon {}", addon_id),
+        BadRequest,
+    );
+    rocket_try!(
+        call!(AddonManager.RestartAddon(addon_id.to_owned())),
+        format!("Failed to restart addon {}", addon_id),
+        BadRequest,
+    );
     Ok(Json(data.0))
 }

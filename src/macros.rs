@@ -23,3 +23,20 @@ macro_rules! send {
 }
 
 pub(crate) use send;
+
+macro_rules! rocket_try {
+    ($res:expr, $msg:expr, $stat:ident $(,)*) => {
+        match $res {
+            Ok(ok) => ok,
+            Err(err) => {
+                error!("{}", format!("{}: {:?}", $msg, err));
+                return Err(rocket::response::status::Custom(
+                    rocket::http::Status::$stat,
+                    $msg.to_string(),
+                ));
+            }
+        }
+    };
+}
+
+pub(crate) use rocket_try;
