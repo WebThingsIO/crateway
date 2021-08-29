@@ -1,4 +1,4 @@
-use rocket::response::status;
+use rocket::{http::Status, response::status};
 use std::fmt::Debug;
 
 macro_rules! call {
@@ -32,8 +32,8 @@ pub trait ToRocket {
     fn to_rocket<S: ToString>(
         self,
         message: S,
-        status: rocket::http::Status,
-    ) -> Result<Self::O, rocket::response::status::Custom<String>>;
+        status: Status,
+    ) -> Result<Self::O, status::Custom<String>>;
 }
 
 impl<O, E> ToRocket for Result<O, E>
@@ -44,13 +44,13 @@ where
     fn to_rocket<S: ToString>(
         self,
         message: S,
-        status: rocket::http::Status,
-    ) -> Result<Self::O, rocket::response::status::Custom<String>> {
+        status: Status,
+    ) -> Result<Self::O, status::Custom<String>> {
         match self {
             Ok(ok) => Ok(ok),
             Err(err) => {
                 error!("{}", format!("{}: {:?}", message.to_string(), err));
-                return Err(status::Custom(status, message.to_string()));
+                Err(status::Custom(status, message.to_string()))
             }
         }
     }
