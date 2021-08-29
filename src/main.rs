@@ -17,17 +17,19 @@ mod addon_manager;
 mod addon_socket;
 mod db;
 mod device;
+mod macros;
 mod model;
 mod process_manager;
 mod rest_api;
 mod router;
 mod user_config;
 
-use crate::addon_manager::{AddonManager, LoadAddons};
-use anyhow::anyhow;
+use crate::{
+    addon_manager::{AddonManager, LoadAddons},
+    macros::call,
+};
 use log::{info, LevelFilter};
 use simplelog::{ColorChoice, ConfigBuilder, TermLogger, TerminalMode};
-use xactor::Service;
 
 #[tokio::main]
 async fn main() {
@@ -52,14 +54,7 @@ async fn main() {
     });
 
     tokio::spawn(async {
-        if let Err(e) = AddonManager::from_registry()
-            .await
-            .expect("Get addon manager")
-            .call(LoadAddons(user_config::ADDONS_DIR.clone()))
-            .await
-            .map_err(|err| anyhow!(err))
-            .flatten()
-        {
+        if let Err(e) = call!(AddonManager.LoadAddons(user_config::ADDONS_DIR.clone())) {
             error!("Failed load addons: {:?}", e);
         }
     });

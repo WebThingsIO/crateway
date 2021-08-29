@@ -5,6 +5,7 @@
 
 use crate::{
     addon_manager::{AddonManager, AddonStopped},
+    macros::send,
     user_config,
 };
 use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
@@ -91,11 +92,7 @@ impl Handler<StartAddon> for ProcessManager {
             match Abortable::new(child.status(), abort_registration).await {
                 Ok(Ok(status)) => {
                     info!("Process of {} exited with code {}", id, status);
-                    AddonManager::from_registry()
-                        .await
-                        .expect("Get addon manager")
-                        .send(AddonStopped(id.clone()))
-                        .expect("Stop addon");
+                    send!(AddonManager.AddonStopped(id.clone())).expect("Stop addon");
                 }
                 Ok(Err(err)) => {
                     error!("Failed to wait for process to terminate: {}", err);
@@ -105,11 +102,7 @@ impl Handler<StartAddon> for ProcessManager {
                     if let Err(err) = child.kill() {
                         error!("Could not kill process {} of {}: {}", child.id(), id, err)
                     }
-                    AddonManager::from_registry()
-                        .await
-                        .expect("Get addon manager")
-                        .send(AddonStopped(id.clone()))
-                        .expect("Stop addon");
+                    send!(AddonManager.AddonStopped(id.clone())).expect("Stop addon");
                 }
             };
         });
