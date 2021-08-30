@@ -226,11 +226,7 @@ async fn get_addons() -> Result<Json<Vec<AddonResponse>>, status::Custom<String>
     let addons =
         call!(AddonManager.GetAddons).to_rocket("Failed to get addons", Status::BadRequest)?;
     Ok(Json(
-        addons
-            .values()
-            .cloned()
-            .map(|addon| AddonResponse::from(addon))
-            .collect(),
+        addons.values().cloned().map(AddonResponse::from).collect(),
     ))
 }
 

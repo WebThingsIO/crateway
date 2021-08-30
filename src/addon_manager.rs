@@ -92,12 +92,12 @@ impl AddonManager {
 
         let package_dir = package_path
             .parent()
-            .ok_or(anyhow!("Missing parent directory"))?;
+            .ok_or_else(|| anyhow!("Missing parent directory"))?;
 
         let file = File::open(package_path.to_owned()).map_err(|err| anyhow!(err))?;
         Archive::new(GzDecoder::new(file))
             .unpack(package_dir)
-            .context(format!("Failed to extract package"))?;
+            .context("Failed to extract package")?;
 
         self.uninstall_addon(package_id.to_owned(), false).await?;
 
@@ -301,7 +301,7 @@ impl Handler<GetAddon> for AddonManager {
         self.installed_addons
             .get(&id)
             .cloned()
-            .ok_or(anyhow!("Unknown addon"))
+            .ok_or_else(|| anyhow!("Unknown addon"))
     }
 }
 
