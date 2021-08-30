@@ -3,10 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::addon_instance::AddonInstance;
-use crate::addon_instance::Msg;
-use anyhow::anyhow;
-use anyhow::Error;
+use crate::{
+    addon_instance::{AddonInstance, Msg},
+    config::CONFIG,
+};
+use anyhow::{anyhow, Error};
 use futures::StreamExt;
 use log::{debug, info};
 use std::net::SocketAddr;
@@ -50,7 +51,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
 pub async fn start() -> Result<(), Error> {
     info!("Starting addon socket");
 
-    let listener = TcpListener::bind("127.0.0.1:9500").await?;
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", CONFIG.ports.ipc)).await?;
     while let Ok((stream, addr)) = listener.accept().await {
         tokio::spawn(handle_connection(stream, addr));
     }

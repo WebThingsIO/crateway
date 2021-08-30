@@ -3,11 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::router;
-use rocket::fs::{relative, FileServer};
-use rocket::{Build, Rocket};
-use std::env;
-use std::env::VarError;
+use crate::{config::CONFIG, router};
+use rocket::{
+    fs::{relative, FileServer},
+    Build, Rocket,
+};
+use std::env::{self, VarError};
 
 fn rocket() -> Rocket<Build> {
     let ui_path = match env::var("WEBTHINGS_UI") {
@@ -27,6 +28,7 @@ fn rocket() -> Rocket<Build> {
 }
 
 pub async fn launch() {
+    env::set_var("ROCKET_PORT", CONFIG.ports.http.to_string());
     rocket()
         .ignite()
         .await

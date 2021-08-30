@@ -1,0 +1,11 @@
+{
+    "ports": {
+        "http": 8080,
+        "ipc": 9500
+    },
+    "addonManager": {
+        "listUrls": [
+            "https://api.webthings.io:8443/addons"
+        ]
+    }
+}
