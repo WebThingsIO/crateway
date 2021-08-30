@@ -56,7 +56,8 @@ impl AddonManager {
         addon.enabled = addon_enabled;
         self.installed_addons.insert(addon_id.to_owned(), addon);
         if !addon_enabled {
-            bail!("Addon not enabled: {}", addon_id)
+            warn!("Addon not enabled: {}", addon_id);
+            return Ok(());
         }
         info!("Loading add-on {}", addon_id);
         call!(ProcessManager.StartAddon(addon_id.to_owned(), path, exec))?;

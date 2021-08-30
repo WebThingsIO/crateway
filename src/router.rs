@@ -38,6 +38,7 @@ pub fn routes() -> Vec<Route> {
         get_settings_addons_info,
         delete_addon,
         post_addons,
+        patch_addon,
         get_user_count,
         get_language,
         get_units,
@@ -311,6 +312,30 @@ async fn post_addons(
         format!("Failed to install add-on {}", addon_id.clone()),
         Status::BadRequest,
     )?;
+    let addon = call!(AddonManager.GetAddon(addon_id.to_owned())).to_rocket(
+        format!("Failed to get addon {}", addon_id),
+        Status::BadRequest,
+    )?;
+    Ok(Json(AddonResponse::from(addon)))
+}
+
+#[derive(Deserialize)]
+struct AddonOrigin {
+    url: String,
+    checksum: String,
+}
+
+#[patch("/addons/<addon_id>", data = "<data>")]
+async fn patch_addon(
+    addon_id: String,
+    data: Json<AddonOrigin>,
+) -> Result<Json<AddonResponse>, status::Custom<String>> {
+    let inst = data.0;
+    call!(AddonManager.InstallAddonFromUrl(addon_id.clone(), inst.url, inst.checksum, false))
+        .to_rocket(
+            format!("Failed to update add-on {}", addon_id.clone()),
+            Status::BadRequest,
+        )?;
     let addon = call!(AddonManager.GetAddon(addon_id.to_owned())).to_rocket(
         format!("Failed to get addon {}", addon_id),
         Status::BadRequest,
