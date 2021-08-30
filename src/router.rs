@@ -4,8 +4,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::{
+    addon::Addon,
     addon_manager::{
-        AddonManager, DisableAddon, EnableAddon, GetAddons, RestartAddon, UninstallAddon,
+        AddonManager, DisableAddon, EnableAddon, GetAddon, GetAddons, InstallAddonFromUrl,
+        RestartAddon, UninstallAddon,
     },
     config::CONFIG,
     db::{Db, GetSetting, GetThing, GetThings, SetSetting},
@@ -35,6 +37,7 @@ pub fn routes() -> Vec<Route> {
         get_addon_license,
         get_settings_addons_info,
         delete_addon,
+        post_addons,
         get_user_count,
         get_language,
         get_units,
@@ -201,15 +204,31 @@ async fn put_addon_config(
     Ok(Json(data.0))
 }
 
+#[derive(Serialize)]
+struct AddonResponse {
+    #[serde(flatten)]
+    pub manifest: Manifest,
+    pub enabled: bool,
+}
+
+impl From<Addon> for AddonResponse {
+    fn from(addon: Addon) -> AddonResponse {
+        AddonResponse {
+            manifest: addon.manifest,
+            enabled: addon.enabled,
+        }
+    }
+}
+
 #[get("/addons")]
-async fn get_addons() -> Result<Json<Vec<Manifest>>, status::Custom<String>> {
+async fn get_addons() -> Result<Json<Vec<AddonResponse>>, status::Custom<String>> {
     let addons =
         call!(AddonManager.GetAddons).to_rocket("Failed to get addons", Status::BadRequest)?;
     Ok(Json(
         addons
             .values()
             .cloned()
-            .map(|addon| addon.manifest)
+            .map(|addon| AddonResponse::from(addon))
             .collect(),
     ))
 }
@@ -273,4 +292,28 @@ async fn get_settings_addons_info() -> Result<Json<serde_json::Value>, status::C
         "nodeVersion": platform::NODE_VERSION.to_owned(),
         "pythonVersions": platform::PYTHON_VERSIONS.to_owned(),
     })))
+}
+
+#[derive(Deserialize)]
+struct InstallableAddon {
+    id: String,
+    url: String,
+    checksum: String,
+}
+
+#[post("/addons", data = "<data>")]
+async fn post_addons(
+    data: Json<InstallableAddon>,
+) -> Result<Json<AddonResponse>, status::Custom<String>> {
+    let inst = data.0;
+    let addon_id = inst.id.clone();
+    call!(AddonManager.InstallAddonFromUrl(inst.id, inst.url, inst.checksum, true)).to_rocket(
+        format!("Failed to install add-on {}", addon_id.clone()),
+        Status::BadRequest,
+    )?;
+    let addon = call!(AddonManager.GetAddon(addon_id.to_owned())).to_rocket(
+        format!("Failed to get addon {}", addon_id),
+        Status::BadRequest,
+    )?;
+    Ok(Json(AddonResponse::from(addon)))
 }

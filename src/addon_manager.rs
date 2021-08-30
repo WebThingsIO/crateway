@@ -12,10 +12,21 @@ use crate::{
     user_config,
 };
 use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
+use flate2::read::GzDecoder;
+use fs_extra::{dir::CopyOptions, move_items};
 use log::{error, info};
 use rust_manifest_types::Manifest;
 use serde_json::json;
-use std::{collections::HashMap, fs, marker::PhantomData, path::PathBuf};
+use sha256::digest_bytes;
+use std::{
+    collections::HashMap,
+    fs::{self, File},
+    io::Write,
+    marker::PhantomData,
+    path::PathBuf,
+};
+use tar::Archive;
+use tempdir::TempDir;
 use xactor::{message, Actor, Addr, Context, Handler, Service};
 
 #[derive(Default)]
@@ -62,6 +73,72 @@ impl AddonManager {
             .get(&id)
             .ok_or_else(|| anyhow!("Package {} not installed", id))?;
         Ok(addon.enabled)
+    }
+    async fn install_addon(
+        &mut self,
+        package_id: String,
+        package_path: PathBuf,
+        enable: bool,
+    ) -> Result<(), Error> {
+        if !package_path.is_file() {
+            return Err(anyhow!(format!(
+                "Cannot extract invalid path: {:?}",
+                package_path,
+            )));
+        }
+
+        info!("Expanding add-on {:?}", package_path);
+
+        let package_dir = package_path
+            .parent()
+            .ok_or(anyhow!("Missing parent directory"))?;
+
+        let file = File::open(package_path.to_owned()).map_err(|err| anyhow!(err))?;
+        Archive::new(GzDecoder::new(file))
+            .unpack(package_dir)
+            .context(format!("Failed to extract package"))?;
+
+        self.uninstall_addon(package_id.to_owned(), false).await?;
+
+        let addon_path = user_config::ADDONS_DIR.join(package_id.to_owned());
+        let entries: Vec<PathBuf> = package_dir
+            .join("package")
+            .read_dir()?
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .collect();
+        fs::create_dir(addon_path.to_owned())?;
+        move_items(&entries, addon_path.to_owned(), &CopyOptions::new())
+            .context("Failed to move package")?;
+
+        let enabled_key = format!("addons.{}.enabled", package_id);
+        if enable {
+            call!(Db.SetSetting(enabled_key, true))?;
+        }
+
+        self.load_addon(addon_path).await?;
+
+        Ok(())
+    }
+
+    async fn uninstall_addon(&mut self, package_id: String, disable: bool) -> Result<(), Error> {
+        if let Err(err) = self.unload_addon(package_id.to_owned()).await {
+            error!("Failed to unload {} properly: {:?}", package_id, err);
+        }
+
+        let addon_path = user_config::ADDONS_DIR.join(package_id.to_owned());
+        if addon_path.exists() && addon_path.is_dir() {
+            fs::remove_dir_all(addon_path).context(format!("Error removing {}", package_id))?;
+        }
+
+        let enabled_key = format!("addons.{}.enabled", package_id);
+        if disable {
+            call!(Db.SetSetting(enabled_key, false))?;
+        }
+
+        self.installed_addons.remove(&package_id);
+
+        Ok(())
     }
 }
 
@@ -210,6 +287,23 @@ impl Handler<GetAddons> for AddonManager {
     }
 }
 
+#[message(result = "Result<Addon, Error>")]
+pub struct GetAddon(pub String);
+
+#[async_trait]
+impl Handler<GetAddon> for AddonManager {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        GetAddon(id): GetAddon,
+    ) -> Result<Addon, Error> {
+        self.installed_addons
+            .get(&id)
+            .cloned()
+            .ok_or(anyhow!("Unknown addon"))
+    }
+}
+
 #[message(result = "Result<(), Error>")]
 pub struct UninstallAddon(pub String);
 
@@ -231,6 +325,35 @@ impl Handler<UninstallAddon> for AddonManager {
         call!(Db.SetSetting(enabled_key, false))
             .context(format!("Failed to disable {}", addon_id))?;
         self.installed_addons.remove(&addon_id);
+        Ok(())
+    }
+}
+
+#[message(result = "Result<(), Error>")]
+pub struct InstallAddonFromUrl(pub String, pub String, pub String, pub bool);
+
+#[async_trait]
+impl Handler<InstallAddonFromUrl> for AddonManager {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        InstallAddonFromUrl(id, url, checksum, enable): InstallAddonFromUrl,
+    ) -> Result<(), Error> {
+        let temp_dir = TempDir::new(&id)?;
+        let dest_path = temp_dir.path().join(format!("{}.tar.gz", id));
+
+        info!("Fetching add-on {} as {:?}", url, dest_path);
+        let res = reqwest::get(&url).await?.bytes().await?;
+        let mut file = File::create(dest_path.clone())?;
+        file.write_all(res.as_ref())?;
+
+        if digest_bytes(res.as_ref()) != checksum.to_lowercase() {
+            return Err(anyhow!(format!(
+                "Checksum did not match for add-on: {}",
+                id,
+            )));
+        }
+        self.install_addon(id, dest_path, enable).await?;
         Ok(())
     }
 }
