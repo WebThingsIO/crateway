@@ -22,9 +22,8 @@ fn rocket() -> Rocket<Build> {
         }
     };
 
-    rocket::build()
-        .mount("/", router::routes())
-        .mount("/", FileServer::from(ui_path))
+    let rocket = rocket::build().mount("/", FileServer::from(ui_path));
+    router::mount(rocket)
 }
 
 pub async fn launch() {
@@ -43,7 +42,10 @@ mod test {
     extern crate rusty_fork;
     extern crate serial_test;
     use super::*;
-    use crate::router::{CurrentLanguage, CurrentTimezone, Jwt, Language, Login, Units};
+    use crate::router::{
+        login_router::{Jwt, Login},
+        settings_router::{CurrentLanguage, CurrentTimezone, Language, Units},
+    };
     use rocket::{http::Status, local::blocking::Client};
     use rusty_fork::rusty_fork_test;
     use serial_test::serial;
@@ -175,7 +177,7 @@ mod test {
             setup();
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
             let response = client.get("/ping").dispatch();
-            assert_eq!(response.status(), Status::Ok);
+            assert_eq!(response.status(), Status::NoContent);
             assert_eq!(response.into_string(), None);
         }
     }
