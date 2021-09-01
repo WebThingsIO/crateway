@@ -5,8 +5,8 @@ use figment::{
 use serde::Deserialize;
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AddonManager {
-    #[serde(rename = "listUrls")]
     pub list_urls: Vec<String>,
 }
 
@@ -17,8 +17,8 @@ pub struct Ports {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Config {
-    #[serde(rename = "addonManager")]
     pub addon_manager: AddonManager,
     pub ports: Ports,
 }
