@@ -5,6 +5,7 @@ use crate::{
         RestartAddon, UninstallAddon,
     },
     db::{Db, GetSetting, SetSetting},
+    jwt::JSONWebToken,
     macros::{call, ToRocket},
     user_config,
 };
@@ -32,7 +33,9 @@ pub fn routes() -> Vec<Route> {
 }
 
 #[get("/")]
-async fn get_addons() -> Result<Json<Vec<AddonResponse>>, status::Custom<String>> {
+async fn get_addons(
+    _jwt: JSONWebToken,
+) -> Result<Json<Vec<AddonResponse>>, status::Custom<String>> {
     let addons =
         call!(AddonManager.GetAddons).to_rocket("Failed to get addons", Status::BadRequest)?;
     Ok(Json(
@@ -49,6 +52,7 @@ struct AddonEnabledState {
 async fn put_addon(
     addon_id: String,
     data: Json<AddonEnabledState>,
+    _jwt: JSONWebToken,
 ) -> Result<Json<AddonEnabledState>, status::Custom<String>> {
     if data.0.enabled {
         call!(AddonManager.EnableAddon(addon_id))
@@ -71,6 +75,7 @@ struct AddonConfig {
 async fn put_addon_config(
     addon_id: String,
     data: Json<AddonConfig>,
+    _jwt: JSONWebToken,
 ) -> Result<Json<AddonConfig>, status::Custom<String>> {
     let config_key = format!("addons.{}.config", addon_id);
     call!(Db.SetSetting(config_key, data.0.config.clone())).to_rocket(
@@ -103,6 +108,7 @@ impl From<Addon> for AddonResponse {
 #[get("/<addon_id>/config")]
 async fn get_addon_config(
     addon_id: String,
+    _jwt: JSONWebToken,
 ) -> Result<Json<serde_json::Value>, status::Custom<String>> {
     let config_key = format!("addons.{}.config", addon_id);
     let config = call!(Db.GetSetting(config_key, PhantomData))
@@ -111,7 +117,10 @@ async fn get_addon_config(
 }
 
 #[get("/<addon_id>/license")]
-async fn get_addon_license(addon_id: String) -> Result<String, status::Custom<String>> {
+async fn get_addon_license(
+    addon_id: String,
+    _jwt: JSONWebToken,
+) -> Result<String, status::Custom<String>> {
     let addon_dir = user_config::ADDONS_DIR.join(addon_id.to_owned());
     let entries = fs::read_dir(addon_dir).to_rocket(
         "Failed to obtain license: Failed to access addon directory",
@@ -144,7 +153,10 @@ async fn get_addon_license(addon_id: String) -> Result<String, status::Custom<St
 }
 
 #[delete("/<addon_id>")]
-async fn delete_addon(addon_id: String) -> Result<status::NoContent, status::Custom<String>> {
+async fn delete_addon(
+    addon_id: String,
+    _jwt: JSONWebToken,
+) -> Result<status::NoContent, status::Custom<String>> {
     call!(AddonManager.UninstallAddon(addon_id.to_owned()))
         .to_rocket("Failed to uninstall add-on", Status::BadRequest)?;
     Ok(status::NoContent)
@@ -160,6 +172,7 @@ struct InstallableAddon {
 #[post("/", data = "<data>")]
 async fn post_addons(
     data: Json<InstallableAddon>,
+    _jwt: JSONWebToken,
 ) -> Result<Json<AddonResponse>, status::Custom<String>> {
     let inst = data.0;
     let addon_id = inst.id.clone();
@@ -184,6 +197,7 @@ struct AddonOrigin {
 async fn patch_addon(
     addon_id: String,
     data: Json<AddonOrigin>,
+    _jwt: JSONWebToken,
 ) -> Result<Json<AddonResponse>, status::Custom<String>> {
     let inst = data.0;
     call!(AddonManager.InstallAddonFromUrl(addon_id.clone(), inst.url, inst.checksum, false))

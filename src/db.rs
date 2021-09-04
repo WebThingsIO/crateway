@@ -3,9 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::{model::Thing, user_config};
+use crate::{
+    model::{Thing, User},
+    user_config,
+};
 use anyhow::{anyhow, Context as AnyhowContext, Result};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::{fmt::Debug, marker::PhantomData, ops::Deref, str::FromStr};
 use xactor::{message, Actor, Context, Handler, Message, Service};
 
@@ -176,6 +179,180 @@ where
     }
 }
 
+#[message(result = "Result<i64>")]
+pub struct CreateUser(pub String, pub String, pub String);
+
+#[async_trait]
+impl Handler<CreateUser> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        CreateUser(email, password, name): CreateUser,
+    ) -> Result<i64> {
+        self.execute(
+            "INSERT INTO users (email, password, name) VALUES (?, ?, ?)",
+            params![email, password, name],
+        )
+        .context("Create user")?;
+        Ok(self.last_insert_rowid())
+    }
+}
+
+#[message(result = "Result<()>")]
+pub struct EditUser(pub User);
+
+#[async_trait]
+impl Handler<EditUser> for Db {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, EditUser(user): EditUser) -> Result<()> {
+        self.execute(
+            "UPDATE users SET email=?, password=?, name=? WHERE id=?",
+            params![user.email, user.password, user.name, user.id],
+        )
+        .context("Edit user")?;
+        Ok(())
+    }
+}
+
+#[message(result = "Result<()>")]
+pub struct DeleteUser(pub i64);
+
+#[async_trait]
+impl Handler<DeleteUser> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        DeleteUser(user_id): DeleteUser,
+    ) -> Result<()> {
+        self.execute("DELETE FROM users WHERE id = ?", params![user_id])
+            .context("Delete user")?;
+        Ok(())
+    }
+}
+
+#[message(result = "Result<Option<User>>")]
+pub enum GetUser {
+    ByEmail(String),
+    ById(i64),
+}
+
+#[async_trait]
+impl Handler<GetUser> for Db {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, msg: GetUser) -> Result<Option<User>> {
+        let f = |row: &Row<'_>| {
+            let id: i64 = row.get(0)?;
+            let email: String = row.get(1)?;
+            let password: String = row.get(2)?;
+            let name: String = row.get(3)?;
+            Ok(User {
+                id,
+                email,
+                password,
+                name,
+            })
+        };
+        match msg {
+            GetUser::ByEmail(email) => {
+                let mut stmt = self
+                    .prepare("SELECT * FROM users WHERE email = ?")
+                    .context("Prepare statement")?;
+                stmt.query_row(params![email], f)
+            }
+            GetUser::ById(id) => {
+                let mut stmt = self
+                    .prepare("SELECT * FROM users WHERE id = ?")
+                    .context("Prepare statement")?;
+                stmt.query_row(params![id], f)
+            }
+        }
+        .optional()
+        .context("Query database")
+    }
+}
+
+#[message(result = "Result<Vec<User>>")]
+pub struct GetUsers;
+
+#[async_trait]
+impl Handler<GetUsers> for Db {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, _msg: GetUsers) -> Result<Vec<User>> {
+        let mut stmt = self
+            .prepare("SELECT * FROM users")
+            .context("Prepare statement")?;
+        let mut rows = stmt.query([]).context("Execute query")?;
+        let mut users = Vec::new();
+        while let Some(row) = rows.next().context("Next row")? {
+            let id: i64 = row.get(0).context("Get parameter")?;
+            let email: String = row.get(1).context("Get parameter")?;
+            let password: String = row.get(2).context("Get parameter")?;
+            let name: String = row.get(3).context("Get parameter")?;
+            users.push(User {
+                id,
+                email,
+                password,
+                name,
+            });
+        }
+        Ok(users)
+    }
+}
+
+#[message(result = "Result<i64>")]
+pub struct GetUserCount;
+
+#[async_trait]
+impl Handler<GetUserCount> for Db {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, _msg: GetUserCount) -> Result<i64> {
+        let mut stmt = self
+            .prepare("SELECT COUNT(*) AS count FROM users")
+            .context("Prepare statement")?;
+        stmt.query_row(params![], |row| {
+            let count: i64 = row.get(0)?;
+            Ok(count)
+        })
+        .context("Query database")
+    }
+}
+
+#[message(result = "Result<()>")]
+pub struct CreateJwt(pub String, pub i64, pub String);
+
+#[async_trait]
+impl Handler<CreateJwt> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        CreateJwt(key_id, user, public_key): CreateJwt,
+    ) -> Result<()> {
+        self.execute(
+            "INSERT INTO jsonwebtokens (keyId, user, publicKey) VALUES (?, ?, ?)",
+            params![key_id, user, public_key],
+        )
+        .context("Insert into jsonwebtokens")?;
+        Ok(())
+    }
+}
+
+#[message(result = "Result<String>")]
+pub struct GetJwtPublicKeyByKeyId(pub String);
+
+#[async_trait]
+impl Handler<GetJwtPublicKeyByKeyId> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        GetJwtPublicKeyByKeyId(kid): GetJwtPublicKeyByKeyId,
+    ) -> Result<String> {
+        let mut stmt = self
+            .prepare("SELECT publicKey FROM jsonwebtokens WHERE keyId = ?")
+            .context("Prepare statement")?;
+        stmt.query_row(params![kid], |row| {
+            let public_key: String = row.get(0)?;
+            Ok(public_key)
+        })
+        .context("Query database")
+    }
+}
+
 impl Deref for Db {
     type Target = Connection;
 
@@ -202,6 +379,28 @@ fn create_tables(conn: &Connection) {
         [],
     )
     .expect("Create table settings");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS users(
+                  id INTEGER PRIMARY KEY ASC,
+                  email TEXT UNIQUE,
+                  password TEXT,
+                  name TEXT
+                  )",
+        [],
+    )
+    .expect("Create table users");
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS jsonwebtokens(
+                  id INTEGER PRIMARY KEY ASC,
+                  keyId TEXT UNIQUE,
+                  user INTEGER,
+                  publicKey TEXT
+                  )",
+        [],
+    )
+    .expect("Create table jsonwebtokens");
 }
 
 #[cfg(test)]

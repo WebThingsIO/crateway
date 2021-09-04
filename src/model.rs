@@ -20,3 +20,16 @@ impl Thing {
         serde_json::from_value(description).context("Parse Thing")
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct User {
+    pub id: i64,
+    pub email: String,
+    pub password: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Jwt {
+    pub jwt: String,
+}

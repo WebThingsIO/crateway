@@ -42,9 +42,12 @@ mod test {
     extern crate rusty_fork;
     extern crate serial_test;
     use super::*;
-    use crate::router::{
-        login_router::{Jwt, Login},
-        settings_router::{CurrentLanguage, CurrentTimezone, Language, Units},
+    use crate::{
+        model::Jwt,
+        router::{
+            login_router::Login,
+            settings_router::{CurrentLanguage, CurrentTimezone, Language, Units},
+        },
     };
     use rocket::{http::Status, local::blocking::Client};
     use rusty_fork::rusty_fork_test;

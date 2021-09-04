@@ -1,4 +1,4 @@
-use crate::{config::CONFIG, platform};
+use crate::{config::CONFIG, jwt::JSONWebToken, platform};
 use rocket::{response::status, serde::json::Json, Route};
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +19,7 @@ pub struct Language {
 }
 
 #[get("/localization/language")]
-fn get_language() -> Json<CurrentLanguage> {
+fn get_language(_jwt: JSONWebToken) -> Json<CurrentLanguage> {
     Json(CurrentLanguage {
         current: String::from("en-US"),
         valid: vec![Language {
@@ -35,7 +35,7 @@ pub struct Units {
 }
 
 #[get("/localization/units")]
-fn get_units() -> Json<Units> {
+fn get_units(_jwt: JSONWebToken) -> Json<Units> {
     Json(Units {
         temperature: String::from("degree celsius"),
     })
@@ -50,7 +50,7 @@ pub struct CurrentTimezone {
 }
 
 #[get("/localization/timezone")]
-fn get_timezone() -> Json<CurrentTimezone> {
+fn get_timezone(_jwt: JSONWebToken) -> Json<CurrentTimezone> {
     Json(CurrentTimezone {
         current: String::from("Europe/Berlin"),
         set_implemented: true,
@@ -69,7 +69,7 @@ pub struct AddonsInfo {
 }
 
 #[get("/addonsInfo")]
-fn get_addons_info() -> Result<Json<AddonsInfo>, status::Custom<String>> {
+fn get_addons_info(_jwt: JSONWebToken) -> Result<Json<AddonsInfo>, status::Custom<String>> {
     Ok(Json(AddonsInfo {
         urls: CONFIG.addon_manager.list_urls.clone(),
         architecture: platform::ARCHITECTURE.to_owned(),

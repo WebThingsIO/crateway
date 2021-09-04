@@ -18,6 +18,7 @@ mod addon_socket;
 mod config;
 mod db;
 mod device;
+mod jwt;
 mod macros;
 mod model;
 mod platform;
