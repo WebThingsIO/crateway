@@ -43,7 +43,8 @@ mod test {
     extern crate serial_test;
     use super::*;
     use crate::{
-        model::Jwt,
+        db::{CreateUser, Db},
+        macros::call,
         router::{
             login_router::Login,
             settings_router::{CurrentLanguage, CurrentTimezone, Language, Units},
@@ -52,7 +53,8 @@ mod test {
     use rocket::{http::Status, local::blocking::Client};
     use rusty_fork::rusty_fork_test;
     use serial_test::serial;
-    use std::{env, fs};
+    use std::{env, fs, thread};
+    use tokio::runtime::Runtime;
 
     #[allow(unused_must_use)]
     fn setup() {
@@ -151,27 +153,25 @@ mod test {
         #[test]
         #[serial]
         fn login() {
-            setup();
-            let client = Client::tracked(rocket()).expect("Valid rocket instance");
-            let email = String::from("foo@bar");
-            let password = String::from("42");
-            let jwt = format!("{}:{}", email, password);
+            thread::spawn(|| {
+                Runtime::new().unwrap().block_on(async {
+                    setup();
+                    call!(Db.CreateUser("foo@bar".to_owned(), "42".to_owned(), "foo".to_owned())).expect("Create user");
+                    let client = Client::tracked(rocket()).expect("Valid rocket instance");
+                    let email = String::from("foo@bar");
+                    let password = String::from("42");
 
-            let login = Login {
-                email,
-                password
-            };
+                    let login = Login {
+                        email,
+                        password
+                    };
 
-            let json = serde_json::to_string(&login).expect("Serialization of test data");
-            let response = client.post("/login").body(json).dispatch();
+                    let json = serde_json::to_string(&login).expect("Serialization of test data");
+                    let response = client.post("/login").body(json).dispatch();
 
-            assert_eq!(response.status(), Status::Ok);
-
-            let expected = Jwt {
-                jwt,
-            };
-
-            assert_eq!(response.into_json::<Jwt>(), Some(expected));
+                    assert_eq!(response.status(), Status::Ok);
+                });
+            });
         }
 
         #[test]

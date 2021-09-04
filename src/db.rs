@@ -189,9 +189,10 @@ impl Handler<CreateUser> for Db {
         _ctx: &mut Context<Self>,
         CreateUser(email, password, name): CreateUser,
     ) -> Result<i64> {
+        let hash = bcrypt::hash(password, bcrypt::DEFAULT_COST)?;
         self.execute(
             "INSERT INTO users (email, password, name) VALUES (?, ?, ?)",
-            params![email, password, name],
+            params![email, hash, name],
         )
         .context("Create user")?;
         Ok(self.last_insert_rowid())

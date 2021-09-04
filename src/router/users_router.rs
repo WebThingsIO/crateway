@@ -98,9 +98,7 @@ async fn post_user(
             "User already exists".to_owned(),
         ))
     } else {
-        let hash = bcrypt::hash(password, bcrypt::DEFAULT_COST)
-            .to_rocket("Failed to hash password", Status::BadRequest)?;
-        let user_id = call!(Db.CreateUser(email.to_owned(), hash, name))
+        let user_id = call!(Db.CreateUser(email.to_owned(), password, name))
             .to_rocket("Failed to create user", Status::BadRequest)?;
         let jwt = jwt::issue_token(user_id)
             .await
