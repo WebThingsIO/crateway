@@ -48,7 +48,7 @@ async fn get_user_info(
             .into_iter()
             .map(|user| UserWithLoggedInState {
                 logged_in: user.id == jwt.user_id(),
-                user: user,
+                user,
             })
             .collect(),
     ))
@@ -92,7 +92,7 @@ async fn post_user(
     } = data.0;
     let user = call!(Db.GetUser::ByEmail(email.to_owned()))
         .to_rocket("Failed to get user".to_owned(), Status::BadRequest)?;
-    if let Some(_) = user {
+    if user.is_some() {
         Err(status::Custom(
             Status::BadRequest,
             "User already exists".to_owned(),

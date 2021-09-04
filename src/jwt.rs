@@ -4,7 +4,6 @@ use crate::{
 };
 use anyhow::{anyhow, Context, Error};
 use chrono::{Duration, Utc};
-use hex;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use openssl::{
     ec::{EcGroup, EcKey},
@@ -52,7 +51,7 @@ async fn decode_token(token: &str) -> Result<TokenData<Claims>, Error> {
         .ok_or_else(|| anyhow!("Failed to obtain kid"))?;
     let pub_key = call!(Db.GetJwtPublicKeyByKeyId(kid))?;
     jsonwebtoken::decode::<Claims>(
-        &token,
+        token,
         &DecodingKey::from_ec_pem(&hex::decode(pub_key)?)?,
         &Validation::new(Algorithm::ES256),
     )
