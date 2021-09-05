@@ -1,7 +1,8 @@
 {
     "ports": {
         "http": 8080,
-        "ipc": 9500
+        "ipc": 9500,
+        "websocket": 8082
     },
     "addonManager": {
         "listUrls": [

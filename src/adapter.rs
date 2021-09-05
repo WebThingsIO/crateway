@@ -3,6 +3,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use crate::device::Device;
+use crate::macros::send;
+use crate::things_socket::{ConnectedMessage, ThingsMessage, ThingsMessages, ThingsSocket};
 use anyhow::{anyhow, Error};
 use std::collections::HashMap;
 use webthings_gateway_ipc_types::{Device as DeviceDescription, Property as PropertyDescription};
@@ -45,9 +47,14 @@ impl Adapter {
         device.update_property(property)
     }
 
-    pub fn set_connect_state(&mut self, device_id: String, state: bool) -> Result<(), Error> {
+    pub async fn set_connect_state(&mut self, device_id: String, state: bool) -> Result<(), Error> {
         let device = self.get_device(&device_id)?;
         device.set_connect_state(state);
+
+        send!(ThingsSocket.ThingsMessage(ThingsMessages::ConnectedMessage(
+            ConnectedMessage::new(device_id, state)
+        )))?;
+
         Ok(())
     }
 
