@@ -24,6 +24,7 @@ mod platform;
 mod process_manager;
 mod rest_api;
 mod router;
+mod things_socket;
 mod user_config;
 
 use crate::{
@@ -53,6 +54,12 @@ async fn main() {
 
     tokio::spawn(async {
         addon_socket::start().await.expect("Starting addon socket");
+    });
+
+    tokio::spawn(async {
+        things_socket::start()
+            .await
+            .expect("Starting things socket");
     });
 
     tokio::spawn(async {

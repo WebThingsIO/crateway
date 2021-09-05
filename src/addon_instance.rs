@@ -89,7 +89,9 @@ impl Handler<Msg> for AddonInstance {
             }
             Message::DeviceAddedNotification(msg) => {
                 let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
+                let id = msg.data.device.id.clone();
                 adapter.add_device(msg.data.device);
+                adapter.set_connect_state(id, true).await?;
             }
             Message::DevicePropertyChangedNotification(msg) => {
                 let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
@@ -97,7 +99,9 @@ impl Handler<Msg> for AddonInstance {
             }
             Message::DeviceConnectedStateNotification(msg) => {
                 let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
-                adapter.set_connect_state(msg.data.device_id, msg.data.connected)?;
+                adapter
+                    .set_connect_state(msg.data.device_id, msg.data.connected)
+                    .await?;
             }
             _ => {}
         };
