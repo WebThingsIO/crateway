@@ -122,8 +122,8 @@ async fn put_user(
     data: Json<UserForEdit>,
     _jwt: JSONWebToken,
 ) -> Result<status::NoContent, status::Custom<String>> {
-    let user =
-        call!(Db.GetUser::ById(user_id)).to_rocket("Failed to get user", Status::BadRequest)?;
+    let user = call!(Db.GetUser::ById(user_id.to_owned()))
+        .to_rocket("Failed to get user", Status::BadRequest)?;
     if let Some(mut user) = user {
         if bcrypt::verify(data.0.password, &user.password)
             .to_rocket("Failed to verify password hash", Status::BadRequest)?
