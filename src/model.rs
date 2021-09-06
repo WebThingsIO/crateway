@@ -55,3 +55,21 @@ impl User {
 pub struct Jwt {
     pub jwt: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_verify_password() {
+        let user = User::new(
+            1,
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned(),
+        )
+        .unwrap();
+        assert!(user.verify_password("password").unwrap());
+        assert!(!user.verify_password("different").unwrap());
+    }
+}
