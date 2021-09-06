@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{anyhow, Context as AnyhowContext, Result};
 use rusqlite::{params, Connection, OptionalExtension, Row};
-use std::{fmt::Debug, marker::PhantomData, ops::Deref, str::FromStr};
+use std::{collections::HashMap, fmt::Debug, marker::PhantomData, ops::Deref, str::FromStr};
 use xactor::{message, Actor, Context, Handler, Message, Service};
 
 pub struct Db(Connection);
@@ -355,6 +355,30 @@ impl Handler<GetJwtPublicKeyByKeyId> for Db {
     }
 }
 
+#[message(result = "Result<HashMap<String, String>>")]
+pub struct GetJwtsByUser(pub i64);
+
+#[async_trait]
+impl Handler<GetJwtsByUser> for Db {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        GetJwtsByUser(user_id): GetJwtsByUser,
+    ) -> Result<HashMap<String, String>> {
+        let mut stmt = self
+            .prepare("SELECT keyId, publicKey FROM jsonwebtokens WHERE user = ?")
+            .context("Prepare statement")?;
+        let mut rows = stmt.query([user_id]).context("Execute query")?;
+        let mut jwts = HashMap::new();
+        while let Some(row) = rows.next().context("Next row")? {
+            let key_id: String = row.get(0).context("Get parameter")?;
+            let public_key: String = row.get(1).context("Get parameter")?;
+            jwts.insert(key_id, public_key);
+        }
+        Ok(jwts)
+    }
+}
+
 impl Deref for Db {
     type Target = Connection;
 
@@ -364,6 +388,9 @@ impl Deref for Db {
 }
 
 fn create_tables(conn: &Connection) {
+    conn.execute("PRAGMA foreign_keys = ON", params![])
+        .expect("Enable foreign key support");
+
     conn.execute(
         "CREATE TABLE IF NOT EXISTS things(
                   id TEXT PRIMARY KEY,
@@ -398,7 +425,9 @@ fn create_tables(conn: &Connection) {
                   id INTEGER PRIMARY KEY ASC,
                   keyId TEXT UNIQUE,
                   user INTEGER,
-                  publicKey TEXT
+                  publicKey TEXT,
+                  FOREIGN KEY (user) REFERENCES users(id) 
+                      ON DELETE CASCADE
                   )",
         [],
     )
@@ -549,6 +578,7 @@ mod tests {
                 assert_eq!(call!(Db.GetUserCount).unwrap(), 2);
             });
         }
+
         #[test]
         #[serial]
         fn test_get_jwt_public_key() {
@@ -557,6 +587,37 @@ mod tests {
                 let user = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
                 call!(Db.CreateJwt("1234".to_owned(), user.id, "key".to_owned())).unwrap();
                 assert_eq!(call!(Db.GetJwtPublicKeyByKeyId("1234".to_owned())).unwrap(), "key");
+            });
+        }
+
+        #[test]
+        #[serial]
+        fn test_get_jwts_by_user() {
+            Runtime::new().unwrap().block_on(async {
+                setup();
+                let user1 = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
+                let user2 = call!(Db.CreateUser("foo@bar".to_owned(), "test1234".to_owned(), "Peter".to_owned())).unwrap();
+                call!(Db.CreateJwt("1234".to_owned(), user1.id, "key1".to_owned())).unwrap();
+                call!(Db.CreateJwt("2345".to_owned(), user1.id, "key2".to_owned())).unwrap();
+                call!(Db.CreateJwt("3456".to_owned(), user2.id, "key3".to_owned())).unwrap();
+                assert_eq!(call!(Db.GetJwtsByUser(user1.id)).unwrap().len(), 2);
+                assert_eq!(call!(Db.GetJwtsByUser(user2.id)).unwrap().len(), 1);
+            });
+        }
+
+        #[test]
+        #[serial]
+        fn test_delete_user_deletes_jwts() {
+            Runtime::new().unwrap().block_on(async {
+                setup();
+                let user1 = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
+                let user2 = call!(Db.CreateUser("foo@bar".to_owned(), "test1234".to_owned(), "Peter".to_owned())).unwrap();
+                call!(Db.CreateJwt("1234".to_owned(), user1.id, "key1".to_owned())).unwrap();
+                call!(Db.CreateJwt("2345".to_owned(), user1.id, "key2".to_owned())).unwrap();
+                call!(Db.CreateJwt("3456".to_owned(), user2.id, "key3".to_owned())).unwrap();
+                call!(Db.DeleteUser(user1.id)).unwrap();
+                assert_eq!(call!(Db.GetJwtsByUser(user1.id)).unwrap().len(), 0);
+                assert_eq!(call!(Db.GetJwtsByUser(user2.id)).unwrap().len(), 1);
             });
         }
     }
