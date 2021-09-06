@@ -33,6 +33,7 @@ impl ConnectedMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(untagged)]
 pub enum ThingsMessages {
     ConnectedMessage(ConnectedMessage),
 }
