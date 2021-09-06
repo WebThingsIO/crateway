@@ -9,6 +9,8 @@ use futures::StreamExt;
 use futures::{stream::SplitSink, SinkExt};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{tungstenite, WebSocketStream};
@@ -27,10 +29,28 @@ impl ConnectedMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyStatusMessage {
+    id: String,
+    data: HashMap<String, Value>,
+}
+
+impl PropertyStatusMessage {
+    pub fn new(id: String, key: String, value: Value) -> PropertyStatusMessage {
+        let mut data = HashMap::new();
+        data.insert(key, value);
+
+        Self { id, data }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(tag = "messageType")]
 pub enum ThingsMessages {
     #[serde(rename = "connected")]
     ConnectedMessage(ConnectedMessage),
+    #[serde(rename = "propertyStatus")]
+    PropertyStatusMessage(PropertyStatusMessage),
 }
 
 #[message(result = "()")]

@@ -37,14 +37,14 @@ impl Adapter {
         }
     }
 
-    pub fn update_property(
+    pub async fn update_property(
         &mut self,
         device_id: String,
         property: PropertyDescription,
     ) -> Result<(), Error> {
         let device = self.get_device(&device_id)?;
 
-        device.update_property(property)
+        device.update_property(property).await
     }
 
     pub async fn set_connect_state(&mut self, device_id: String, state: bool) -> Result<(), Error> {

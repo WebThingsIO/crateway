@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use crate::macros::send;
+use crate::things_socket::{PropertyStatusMessage, ThingsMessage, ThingsMessages, ThingsSocket};
 use anyhow::{anyhow, Error};
 use log::debug;
+use rocket::serde::json::Value;
 use webthings_gateway_ipc_types::{Device as DeviceDescription, Property};
 
 pub struct Device {
@@ -12,7 +15,7 @@ pub struct Device {
 }
 
 impl Device {
-    pub(crate) fn update_property(&mut self, new_property: Property) -> Result<(), Error> {
+    pub(crate) async fn update_property(&mut self, new_property: Property) -> Result<(), Error> {
         let id = self.description.id.clone();
 
         let name = new_property
@@ -32,8 +35,18 @@ impl Device {
                 "Property {} of device {} changed from {:?} to {:?}",
                 name, id, property.value, new_property.value
             );
+
+            send!(
+                ThingsSocket.ThingsMessage(ThingsMessages::PropertyStatusMessage(
+                    PropertyStatusMessage::new(
+                        id,
+                        name.clone(),
+                        new_property.value.clone().unwrap_or(Value::Null)
+                    )
+                ))
+            )?;
         }
-        properties.insert(name, new_property);
+        properties.insert(name.clone(), new_property.clone());
         Ok(())
     }
 

@@ -95,7 +95,9 @@ impl Handler<Msg> for AddonInstance {
             }
             Message::DevicePropertyChangedNotification(msg) => {
                 let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
-                adapter.update_property(msg.data.device_id, msg.data.property)?;
+                adapter
+                    .update_property(msg.data.device_id, msg.data.property)
+                    .await?;
             }
             Message::DeviceConnectedStateNotification(msg) => {
                 let adapter = self.get_adapter_mut(&msg.data.adapter_id)?;
