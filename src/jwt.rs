@@ -145,3 +145,37 @@ fn generate_key_pair() -> Result<(Vec<u8>, Vec<u8>), Error> {
 
     Ok((pub_key, priv_key))
 }
+
+#[cfg(test)]
+mod tests {
+    extern crate rusty_fork;
+    extern crate serial_test;
+    use super::*;
+    use crate::db::{CreateUser, Db};
+    use rusty_fork::rusty_fork_test;
+    use serial_test::serial;
+    use std::{env, fs};
+    use tokio::runtime::Runtime;
+
+    #[allow(unused_must_use)]
+    fn setup() {
+        let dir = env::temp_dir().join(".webthingsio");
+        fs::remove_dir_all(&dir); // We really don't want to handle this result, since we don't care if the directory never existed
+        env::set_var("WEBTHINGS_HOME", dir);
+    }
+
+    rusty_fork_test! {
+        #[test]
+        #[serial]
+        fn test_issue_decode() {
+            Runtime::new().unwrap().block_on(async {
+                setup();
+                let user = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
+                let token = issue_token(user.id).await.unwrap();
+                let data = decode_token(&token).await.unwrap();
+                assert_eq!(data.claims.user, user.id);
+                assert_eq!(data.claims.role, Role::UserToken);
+            });
+        }
+    }
+}
