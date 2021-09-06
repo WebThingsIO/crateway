@@ -15,25 +15,21 @@ use tokio_tungstenite::{tungstenite, WebSocketStream};
 use xactor::{message, Actor, Context, Handler, Service};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
 pub struct ConnectedMessage {
     id: String,
-    message_type: String,
     data: bool,
 }
 
 impl ConnectedMessage {
     pub fn new(id: String, data: bool) -> ConnectedMessage {
-        Self {
-            id,
-            message_type: String::from("connected"),
-            data,
-        }
+        Self { id, data }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[serde(tag = "messageType")]
 pub enum ThingsMessages {
+    #[serde(rename = "connected")]
     ConnectedMessage(ConnectedMessage),
 }
 
