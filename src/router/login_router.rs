@@ -22,7 +22,8 @@ async fn login(data: Json<Login>) -> Result<Json<Jwt>, status::Custom<String>> {
     let user = call!(Db.GetUser::ByEmail(data.0.email))
         .to_rocket("Failed to get user", Status::BadRequest)?;
     if let Some(user) = user {
-        if !bcrypt::verify(data.0.password, &user.password)
+        if !user
+            .verify_password(&data.0.password)
             .to_rocket("Unauthorized", Status::Unauthorized)?
         {
             return Err(status::Custom(

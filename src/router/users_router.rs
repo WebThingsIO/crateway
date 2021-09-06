@@ -98,9 +98,9 @@ async fn post_user(
             "User already exists".to_owned(),
         ))
     } else {
-        let user_id = call!(Db.CreateUser(email.to_owned(), password, name))
+        let user = call!(Db.CreateUser(email.to_owned(), password, name))
             .to_rocket("Failed to create user", Status::BadRequest)?;
-        let jwt = jwt::issue_token(user_id)
+        let jwt = jwt::issue_token(user.id)
             .await
             .to_rocket("Failed to issue token", Status::BadRequest)?;
         Ok(Json(Jwt { jwt }))
@@ -125,7 +125,8 @@ async fn put_user(
     let user = call!(Db.GetUser::ById(user_id.to_owned()))
         .to_rocket("Failed to get user", Status::BadRequest)?;
     if let Some(mut user) = user {
-        if bcrypt::verify(data.0.password, &user.password)
+        if user
+            .verify_password(&data.0.password)
             .to_rocket("Failed to verify password hash", Status::BadRequest)?
         {
             return Err(status::Custom(
@@ -135,8 +136,8 @@ async fn put_user(
         }
 
         if let Some(new_password) = data.0.new_password {
-            user.password = bcrypt::hash(new_password, bcrypt::DEFAULT_COST)
-                .to_rocket("Failed to hash new password", Status::BadRequest)?;
+            user.set_password(new_password)
+                .to_rocket("Failed to hash new password", Status::BadRequest)?
         }
         user.email = data.0.email;
         user.name = data.0.name;
