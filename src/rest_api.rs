@@ -278,6 +278,7 @@ mod test {
         #[test]
         #[serial]
         fn test_protected_routes() {
+            setup();
             env::set_var("CHECK_JWT", "1");
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
             let header = Header::new("Authorization", "Bearer token");
@@ -339,6 +340,7 @@ mod test {
         #[test]
         #[serial]
         fn test_unprotected_routes() {
+            setup();
             env::set_var("CHECK_JWT", "1");
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
 
@@ -360,6 +362,7 @@ mod test {
         #[test]
         #[serial]
         fn test_jwt_header() {
+            setup();
             env::set_var("CHECK_JWT", "1");
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
             let header = Header::new("Authorization", "Bearer token");
@@ -372,6 +375,7 @@ mod test {
         #[test]
         #[serial]
         fn test_jwt_query() {
+            setup();
             env::set_var("CHECK_JWT", "1");
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
 
