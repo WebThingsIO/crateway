@@ -50,8 +50,12 @@ mod test {
             settings_router::{CurrentLanguage, CurrentTimezone, Language, Units},
         },
     };
-    use rocket::{http::Status, local::blocking::Client};
+    use rocket::{
+        http::{Header, Method, Status},
+        local::blocking::Client,
+    };
     use rusty_fork::rusty_fork_test;
+    use serde_json::json;
     use serial_test::serial;
     use std::{env, fs, thread};
     use tokio::runtime::Runtime;
@@ -156,6 +160,7 @@ mod test {
             thread::spawn(|| {
                 Runtime::new().unwrap().block_on(async {
                     setup();
+                    env::set_var("CHECK_JWT", "1");
                     call!(Db.CreateUser("foo@bar".to_owned(), "42".to_owned(), "foo".to_owned())).expect("Create user");
                     let client = Client::tracked(rocket()).expect("Valid rocket instance");
                     let email = String::from("foo@bar");
@@ -176,12 +181,145 @@ mod test {
 
         #[test]
         #[serial]
+        fn login_fail() {
+            thread::spawn(|| {
+                Runtime::new().unwrap().block_on(async {
+                    setup();
+                    env::set_var("CHECK_JWT", "1");
+                    call!(Db.CreateUser("foo@bar".to_owned(), "42".to_owned(), "foo".to_owned())).expect("Create user");
+                    let client = Client::tracked(rocket()).expect("Valid rocket instance");
+                    let email = String::from("test@test");
+                    let password = String::from("42");
+
+                    let login = Login {
+                        email,
+                        password
+                    };
+
+                    let json = serde_json::to_string(&login).expect("Serialization of test data");
+                    let response = client.post("/login").body(json).dispatch();
+
+                    assert_eq!(response.status(), Status::Unauthorized);
+                });
+            });
+        }
+
+        #[test]
+        #[serial]
         fn ping() {
             setup();
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
             let response = client.get("/ping").dispatch();
             assert_eq!(response.status(), Status::NoContent);
             assert_eq!(response.into_string(), None);
+        }
+
+        #[test]
+        fn test_protected_routes() {
+            env::set_var("CHECK_JWT", "1");
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+            let header = Header::new("Authorization", "Bearer token");
+
+            let protected_routes = vec![
+                (Method::Get, "/addons", json!({})),
+                (Method::Put, "/addons/an_addon", json!({"enabled": true})),
+                (
+                    Method::Put,
+                    "/addons/an_addon/config",
+                    json!({"config": {}}),
+                ),
+                (Method::Get, "/addons/an_addon/config", json!({})),
+                (Method::Get, "/addons/an_addon/license", json!({})),
+                (Method::Delete, "/addons/an_addon", json!({})),
+                (
+                    Method::Post,
+                    "/addons",
+                    json!({"id": "", "url": "", "checksum": ""}),
+                ),
+                (
+                    Method::Patch,
+                    "/addons/an_addon",
+                    json!({"url": "", "checksum": ""}),
+                ),
+                (Method::Get, "/extensions", json!({})),
+                (Method::Get, "/settings/localization/language", json!({})),
+                (Method::Get, "/settings/localization/units", json!({})),
+                (Method::Get, "/settings/localization/timezone", json!({})),
+                (Method::Get, "/settings/addonsInfo", json!({})),
+                (Method::Get, "/things", json!({})),
+                (Method::Get, "/things/a_thing", json!({})),
+                (Method::Get, "/users/info", json!({})),
+                (Method::Get, "/users/a_user", json!({})),
+                (
+                    Method::Put,
+                    "/users/a_user",
+                    json!({"email": "", "password": "", "newPassword": "", "name": ""}),
+                ),
+                (Method::Delete, "/users/a_user", json!({})),
+            ];
+
+            for (method, route, param) in protected_routes {
+                let response = client
+                    .req(method, route)
+                    .body(serde_json::to_string(&param).unwrap())
+                    .dispatch();
+                assert_eq!(response.status(), Status::Unauthorized);
+                let response = client
+                    .req(method, route)
+                    .body(serde_json::to_string(&param).unwrap())
+                    .header(header.clone())
+                    .dispatch();
+                assert_ne!(response.status(), Status::Unauthorized);
+                assert_ne!(response.status(), Status::UnprocessableEntity);
+            }
+        }
+
+        #[test]
+        fn test_unprotected_routes() {
+            env::set_var("CHECK_JWT", "1");
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+
+            let unprotected_routes = vec![
+                (Method::Get, "/ping", json!({})),
+                (Method::Get, "/users/count", json!({})),
+            ];
+
+            for (method, route, param) in unprotected_routes {
+                let response = client
+                    .req(method, route)
+                    .body(serde_json::to_string(&param).unwrap())
+                    .dispatch();
+                assert_ne!(response.status(), Status::Unauthorized);
+                assert_ne!(response.status(), Status::UnprocessableEntity);
+            }
+        }
+
+        #[test]
+        fn test_jwt_header() {
+            env::set_var("CHECK_JWT", "1");
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+            let header = Header::new("Authorization", "Bearer token");
+
+            let response = client
+                .get("/things")
+                .body("")
+                .header(header)
+                .dispatch();
+            assert_ne!(response.status(), Status::Unauthorized);
+            assert_ne!(response.status(), Status::UnprocessableEntity);
+        }
+
+        #[test]
+        fn test_jwt_query() {
+            env::set_var("CHECK_JWT", "1");
+            let client = Client::tracked(rocket()).expect("Valid rocket instance");
+
+            let response = client
+                .get("/things?jwt=token")
+                .body("")
+                .dispatch();
+            assert_ne!(response.status(), Status::Unauthorized);
+            assert_ne!(response.status(), Status::UnprocessableEntity);
         }
     }
 }
