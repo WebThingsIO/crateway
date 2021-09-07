@@ -182,7 +182,12 @@ mod tests {
         fn test_issue_decode() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                let user = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
+                let user = call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
                 let token = issue_token(user.id).await.unwrap();
                 let data = decode_token(&token).await.unwrap();
                 assert_eq!(data.claims.user, user.id);

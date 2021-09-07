@@ -498,7 +498,12 @@ mod tests {
         fn test_get_user_by_id() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                let created_user = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
+                let created_user = call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
                 let user = call!(Db.GetUser::ById(created_user.id)).unwrap().unwrap();
                 assert_eq!(user.id, created_user.id);
                 assert_eq!(user.email, "test@test");
@@ -512,8 +517,15 @@ mod tests {
         fn test_get_user_by_email() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                let created_user = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
-                let user = call!(Db.GetUser::ByEmail(created_user.email)).unwrap().unwrap();
+                let created_user = call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
+                let user = call!(Db.GetUser::ByEmail(created_user.email))
+                    .unwrap()
+                    .unwrap();
                 assert_eq!(user.id, created_user.id);
                 assert_eq!(user.email, "test@test");
                 assert!(user.verify_password("password").unwrap());
@@ -526,8 +538,22 @@ mod tests {
         fn test_edit_user() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                let created_user = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
-                call!(Db.EditUser(User::new(created_user.id, "foo@bar".to_owned(), "test1234".to_owned(), "Peter".to_owned()).unwrap())).unwrap();
+                let created_user = call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
+                call!(Db.EditUser(
+                    User::new(
+                        created_user.id,
+                        "foo@bar".to_owned(),
+                        "test1234".to_owned(),
+                        "Peter".to_owned()
+                    )
+                    .unwrap()
+                ))
+                .unwrap();
                 let edited_user = call!(Db.GetUser::ById(created_user.id)).unwrap().unwrap();
                 assert_eq!(edited_user.id, created_user.id);
                 assert_eq!(edited_user.email, "foo@bar");
@@ -541,7 +567,12 @@ mod tests {
         fn test_delete_user() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                let created_user = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
+                let created_user = call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
                 assert!(call!(Db.DeleteUser(created_user.id)).is_ok());
             });
         }
@@ -551,19 +582,29 @@ mod tests {
         fn test_get_users() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
-                call!(Db.CreateUser("foo@bar".to_owned(), "test1234".to_owned(), "Peter".to_owned())).unwrap();
+                call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
+                call!(Db.CreateUser(
+                    "foo@bar".to_owned(),
+                    "test1234".to_owned(),
+                    "Peter".to_owned()
+                ))
+                .unwrap();
                 let users = call!(Db.GetUsers).unwrap();
                 assert_eq!(users.len(), 2);
                 assert!(users.iter().any(|user| {
-                    user.email == "test@test" &&
-                    user.verify_password("password").unwrap() &&
-                    user.name == "Tester"
+                    user.email == "test@test"
+                        && user.verify_password("password").unwrap()
+                        && user.name == "Tester"
                 }));
                 assert!(users.iter().any(|user| {
-                    user.email == "foo@bar" &&
-                    user.verify_password("test1234").unwrap() &&
-                    user.name == "Peter"
+                    user.email == "foo@bar"
+                        && user.verify_password("test1234").unwrap()
+                        && user.name == "Peter"
                 }));
             });
         }
@@ -573,8 +614,18 @@ mod tests {
         fn test_get_user_count() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
-                call!(Db.CreateUser("foo@bar".to_owned(), "test1234".to_owned(), "Peter".to_owned())).unwrap();
+                call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
+                call!(Db.CreateUser(
+                    "foo@bar".to_owned(),
+                    "test1234".to_owned(),
+                    "Peter".to_owned()
+                ))
+                .unwrap();
                 assert_eq!(call!(Db.GetUserCount).unwrap(), 2);
             });
         }
@@ -584,9 +635,17 @@ mod tests {
         fn test_get_jwt_public_key() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                let user = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
+                let user = call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
                 call!(Db.CreateJwt("1234".to_owned(), user.id, "key".to_owned())).unwrap();
-                assert_eq!(call!(Db.GetJwtPublicKeyByKeyId("1234".to_owned())).unwrap(), "key");
+                assert_eq!(
+                    call!(Db.GetJwtPublicKeyByKeyId("1234".to_owned())).unwrap(),
+                    "key"
+                );
             });
         }
 
@@ -595,8 +654,18 @@ mod tests {
         fn test_get_jwts_by_user() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                let user1 = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
-                let user2 = call!(Db.CreateUser("foo@bar".to_owned(), "test1234".to_owned(), "Peter".to_owned())).unwrap();
+                let user1 = call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
+                let user2 = call!(Db.CreateUser(
+                    "foo@bar".to_owned(),
+                    "test1234".to_owned(),
+                    "Peter".to_owned()
+                ))
+                .unwrap();
                 call!(Db.CreateJwt("1234".to_owned(), user1.id, "key1".to_owned())).unwrap();
                 call!(Db.CreateJwt("2345".to_owned(), user1.id, "key2".to_owned())).unwrap();
                 call!(Db.CreateJwt("3456".to_owned(), user2.id, "key3".to_owned())).unwrap();
@@ -610,8 +679,18 @@ mod tests {
         fn test_delete_user_deletes_jwts() {
             Runtime::new().unwrap().block_on(async {
                 setup();
-                let user1 = call!(Db.CreateUser("test@test".to_owned(), "password".to_owned(), "Tester".to_owned())).unwrap();
-                let user2 = call!(Db.CreateUser("foo@bar".to_owned(), "test1234".to_owned(), "Peter".to_owned())).unwrap();
+                let user1 = call!(Db.CreateUser(
+                    "test@test".to_owned(),
+                    "password".to_owned(),
+                    "Tester".to_owned()
+                ))
+                .unwrap();
+                let user2 = call!(Db.CreateUser(
+                    "foo@bar".to_owned(),
+                    "test1234".to_owned(),
+                    "Peter".to_owned()
+                ))
+                .unwrap();
                 call!(Db.CreateJwt("1234".to_owned(), user1.id, "key1".to_owned())).unwrap();
                 call!(Db.CreateJwt("2345".to_owned(), user1.id, "key2".to_owned())).unwrap();
                 call!(Db.CreateJwt("3456".to_owned(), user2.id, "key3".to_owned())).unwrap();

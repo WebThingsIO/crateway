@@ -130,8 +130,8 @@ mod test {
             let response = client.get("/settings/localization/units").dispatch();
             assert_eq!(response.status(), Status::Ok);
 
-            let expected =  Units {
-                 temperature: String::from("degree celsius"),
+            let expected = Units {
+                temperature: String::from("degree celsius"),
             };
 
             assert_eq!(response.into_json::<Units>(), Some(expected));
@@ -161,15 +161,13 @@ mod test {
                 Runtime::new().unwrap().block_on(async {
                     setup();
                     env::set_var("CHECK_JWT", "1");
-                    call!(Db.CreateUser("foo@bar".to_owned(), "42".to_owned(), "foo".to_owned())).expect("Create user");
+                    call!(Db.CreateUser("foo@bar".to_owned(), "42".to_owned(), "foo".to_owned()))
+                        .expect("Create user");
                     let client = Client::tracked(rocket()).expect("Valid rocket instance");
                     let email = String::from("foo@bar");
                     let password = String::from("42");
 
-                    let login = Login {
-                        email,
-                        password
-                    };
+                    let login = Login { email, password };
 
                     let json = serde_json::to_string(&login).expect("Serialization of test data");
                     let response = client.post("/login").body(json).dispatch();
@@ -186,15 +184,13 @@ mod test {
                 Runtime::new().unwrap().block_on(async {
                     setup();
                     env::set_var("CHECK_JWT", "1");
-                    call!(Db.CreateUser("foo@bar".to_owned(), "42".to_owned(), "foo".to_owned())).expect("Create user");
+                    call!(Db.CreateUser("foo@bar".to_owned(), "42".to_owned(), "foo".to_owned()))
+                        .expect("Create user");
                     let client = Client::tracked(rocket()).expect("Valid rocket instance");
                     let email = String::from("test@test");
                     let password = String::from("42");
 
-                    let login = Login {
-                        email,
-                        password
-                    };
+                    let login = Login { email, password };
 
                     let json = serde_json::to_string(&login).expect("Serialization of test data");
                     let response = client.post("/login").body(json).dispatch();
@@ -258,7 +254,15 @@ mod test {
         fn post_user_initial() {
             setup();
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
-            let response = client.post("/users").body(serde_json::to_string(&json!({"email": "test@test", "password": "password", "name": "Tester"})).unwrap()).dispatch();
+            let response = client
+                .post("/users")
+                .body(
+                    serde_json::to_string(
+                        &json!({"email": "test@test", "password": "password", "name": "Tester"}),
+                    )
+                    .unwrap(),
+                )
+                .dispatch();
             assert_eq!(response.status(), Status::Ok);
         }
 
@@ -360,11 +364,7 @@ mod test {
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
             let header = Header::new("Authorization", "Bearer token");
 
-            let response = client
-                .get("/things")
-                .body("")
-                .header(header)
-                .dispatch();
+            let response = client.get("/things").body("").header(header).dispatch();
             assert_ne!(response.status(), Status::Unauthorized);
             assert_ne!(response.status(), Status::UnprocessableEntity);
         }
@@ -375,10 +375,7 @@ mod test {
             env::set_var("CHECK_JWT", "1");
             let client = Client::tracked(rocket()).expect("Valid rocket instance");
 
-            let response = client
-                .get("/things?jwt=token")
-                .body("")
-                .dispatch();
+            let response = client.get("/things?jwt=token").body("").dispatch();
             assert_ne!(response.status(), Status::Unauthorized);
             assert_ne!(response.status(), Status::UnprocessableEntity);
         }
