@@ -94,8 +94,8 @@ async fn forward_stream(stream: TcpStream, addr: SocketAddr) -> Result<(), Error
             let mut stream = stream.into_inner();
 
             let port = match result {
-                RoutingResult::Rest => 8081,
-                RoutingResult::Websocket(_) => 8082,
+                RoutingResult::Rest => CONFIG.ports.http,
+                RoutingResult::Websocket(_) => CONFIG.ports.websocket,
             };
 
             let addr = format!("127.0.0.1:{}", port)
