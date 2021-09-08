@@ -64,7 +64,7 @@ pub async fn start() -> Result<(), Error> {
         debug!("Incoming tcp connection from {}", addr);
 
         if let Err(err) = forward_stream(stream, addr).await {
-            error!("Failed to forward stream to {}: {}", addr, err);
+            error!("Failed to forward stream from {}: {}", addr, err);
         }
     }
 }
