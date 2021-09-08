@@ -1,5 +1,6 @@
 use crate::{
     db::{Db, GetThing, GetThings},
+    jwt::JSONWebToken,
     macros::{call, ToRocket},
     model::Thing,
 };
@@ -10,7 +11,7 @@ pub fn routes() -> Vec<Route> {
 }
 
 #[get("/")]
-async fn get_things() -> Result<Json<Vec<Thing>>, status::Custom<String>> {
+async fn get_things(_jwt: JSONWebToken) -> Result<Json<Vec<Thing>>, status::Custom<String>> {
     let t =
         call!(Db.GetThings).to_rocket("Error during db.get_things", Status::InternalServerError)?;
 
@@ -18,7 +19,10 @@ async fn get_things() -> Result<Json<Vec<Thing>>, status::Custom<String>> {
 }
 
 #[get("/<thing_id>")]
-async fn get_thing(thing_id: String) -> Result<Option<Json<Thing>>, status::Custom<String>> {
+async fn get_thing(
+    thing_id: String,
+    _jwt: JSONWebToken,
+) -> Result<Option<Json<Thing>>, status::Custom<String>> {
     let t = call!(Db.GetThing(thing_id.to_owned()))
         .to_rocket("Error during db.get_thing", Status::InternalServerError)?;
     if let Some(t) = t {
