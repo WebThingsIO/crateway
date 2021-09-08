@@ -39,33 +39,20 @@ impl Decoder for HttpTunnelCodec {
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut req = Request::new(&mut headers);
 
-        match req.parse(src) {
-            Ok(status) => {
-                if status.is_complete() {
-                    match req.headers.iter().find(|header| header.name == "Upgrade") {
-                        Some(header) => match String::from_utf8(header.value.to_vec()) {
-                            Ok(value) => {
-                                if value == "websocket" {
-                                    match req.path {
-                                        Some(path) => {
-                                            Ok(Some(RoutingResult::Websocket(path.to_owned())))
-                                        }
-                                        None => Err(anyhow!("Failed to parse path")),
-                                    }
-                                } else {
-                                    Ok(Some(RoutingResult::Rest))
-                                }
-                            }
-                            Err(err) => Err(anyhow!("Failed to parse upgrade header: {}", err)),
-                        },
-                        None => Ok(Some(RoutingResult::Rest)),
-                    }
-                } else {
-                    Ok(None)
-                }
-            }
-            Err(err) => Err(anyhow!("Failed to parse incoming request: {}", err)),
+        let status = req.parse(src).context("Failed to parse incoming request")?;
+        if !status.is_complete() {
+            return Ok(None);
         }
+        if let Some(header) = req.headers.iter().find(|header| header.name == "Upgrade") {
+            let value = String::from_utf8(header.value.to_vec())
+                .context("Failed to parse upgrade header")?;
+
+            if value == "websocket" {
+                let path = req.path.ok_or_else(|| anyhow!("Failed to parse path"))?;
+                return Ok(Some(RoutingResult::Websocket(path.to_owned())));
+            }
+        }
+         Ok(Some(RoutingResult::Rest))
     }
 }
 
