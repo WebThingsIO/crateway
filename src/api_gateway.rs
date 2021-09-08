@@ -52,7 +52,7 @@ impl Decoder for HttpTunnelCodec {
                 return Ok(Some(RoutingResult::Websocket(path.to_owned())));
             }
         }
-         Ok(Some(RoutingResult::Rest))
+        Ok(Some(RoutingResult::Rest))
     }
 }
 
