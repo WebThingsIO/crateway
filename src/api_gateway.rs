@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::config::CONFIG;
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Context, Error};
 use bytes::BytesMut;
 use futures::StreamExt;
 use httparse::Request;
