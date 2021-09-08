@@ -15,6 +15,7 @@ mod addon;
 mod addon_instance;
 mod addon_manager;
 mod addon_socket;
+mod api_gateway;
 mod config;
 mod db;
 mod device;
@@ -66,6 +67,12 @@ async fn main() {
     tokio::spawn(async {
         if let Err(e) = call!(AddonManager.LoadAddons(user_config::ADDONS_DIR.clone())) {
             error!("Failed load addons: {:?}", e);
+        }
+    });
+
+    tokio::spawn(async {
+        if let Err(err) = api_gateway::start().await {
+            error!("Failed to start api {:?}", err);
         }
     });
 

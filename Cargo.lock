@@ -372,6 +372,7 @@ dependencies = [
  "anyhow",
  "async-process",
  "bcrypt",
+ "bytes",
  "chrono",
  "dirs",
  "figment",
@@ -380,6 +381,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
+ "httparse",
  "jsonwebtoken",
  "lazy_static",
  "log",
@@ -399,6 +401,7 @@ dependencies = [
  "tempdir",
  "tokio",
  "tokio-tungstenite",
+ "tokio-util",
  "uuid",
  "webthings-gateway-ipc-types",
  "xactor",
@@ -843,9 +846,9 @@ dependencies = [
 
 [[package]]
 name = "httparse"
-version = "1.4.1"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3a87b616e37e93c22fb19bcd386f02f3af5ea98a25670ad0fce773de23c5e68"
+checksum = "acd94fdbe1d4ff688b67b04eee2e17bd50995534a61539e45adfefb45e5e5503"
 
 [[package]]
 name = "httpdate"
@@ -2341,9 +2344,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.7"
+version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1caa0b0c8d94a049db56b5acf8cba99dc0623aab1b26d5b5f5e2d945846b3592"
+checksum = "08d3725d3efa29485e87311c5b699de63cde14b00ed4d256b8318aa30ca452cd"
 dependencies = [
  "bytes",
  "futures-core",
