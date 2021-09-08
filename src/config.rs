@@ -12,6 +12,7 @@ pub struct AddonManager {
 
 #[derive(Deserialize)]
 pub struct Ports {
+    pub api: u16,
     pub http: u16,
     pub ipc: u16,
     pub websocket: u16,
