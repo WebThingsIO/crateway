@@ -3,8 +3,9 @@ use reqwest::{Method, RequestBuilder, StatusCode};
 use serde_json::json;
 use serial_test::serial;
 
-mod gateway;
 extern crate serial_test;
+#[path = "./gateway.rs"]
+mod gateway;
 
 #[path = "rest_api/extensions.rs"]
 mod extensions;
