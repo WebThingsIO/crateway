@@ -125,7 +125,7 @@ async fn put_user(
     let user = call!(Db.GetUser::ById(user_id.to_owned()))
         .to_rocket("Failed to get user", Status::BadRequest)?;
     if let Some(mut user) = user {
-        if user
+        if !user
             .verify_password(&data.0.password)
             .to_rocket("Failed to verify password hash", Status::BadRequest)?
         {

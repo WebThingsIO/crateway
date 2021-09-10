@@ -104,6 +104,21 @@ impl Gateway {
             .send_req()
             .await
     }
+
+    pub async fn delete<U: FromResponseBody>(&self, path: &str) -> (StatusCode, U) {
+        RequestBuilder::build_from(self, Method::DELETE, path)
+            .add_authorization(self)
+            .send_req()
+            .await
+    }
+
+    pub async fn create_secondary_user(&self) {
+        self.post::<serde_json::Value>(
+            "/users",
+            json!({"email": "foo@bar", "password": "42", "name": "foo"}),
+        )
+        .await;
+    }
 }
 
 fn create_dirs() -> Dirs {
