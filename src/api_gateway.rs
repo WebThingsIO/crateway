@@ -60,16 +60,16 @@ pub async fn start() -> Result<(), Error> {
     let listener = TcpListener::bind(format!("127.0.0.1:{}", CONFIG.ports.api)).await?;
 
     loop {
-        let (stream, addr) = listener.accept().await?;
-        debug!("Incoming tcp connection from {}", addr);
+        let (stream, source_address) = listener.accept().await?;
+        debug!("Incoming tcp connection from {}", source_address);
 
-        if let Err(err) = forward_stream(stream, addr).await {
-            error!("Failed to forward stream from {}: {}", addr, err);
+        if let Err(err) = forward_stream(stream, source_address).await {
+            error!("Failed to forward stream from {}: {}", source_address, err);
         }
     }
 }
 
-async fn forward_stream(stream: TcpStream, addr: SocketAddr) -> Result<(), Error> {
+async fn forward_stream(stream: TcpStream, source_address: SocketAddr) -> Result<(), Error> {
     let codec = HttpTunnelCodec;
     let mut stream = codec.framed(stream);
 
@@ -85,20 +85,26 @@ async fn forward_stream(stream: TcpStream, addr: SocketAddr) -> Result<(), Error
                 RoutingResult::Websocket(_) => CONFIG.ports.websocket,
             };
 
-            let addr = format!("127.0.0.1:{}", port)
+            let target_address = format!("127.0.0.1:{}", port)
                 .parse::<SocketAddr>()
                 .expect("Failed to parse forward address");
 
-            debug!("Forwarding connection to {}", addr);
+            debug!("Forwarding connection to {}", target_address);
 
-            let mut remote_stream = TcpStream::connect(&addr)
+            let mut remote_stream = TcpStream::connect(&target_address)
                 .await
-                .map_err(|err| anyhow!("Could not connect to {}: {}", addr, err))?;
+                .map_err(|err| anyhow!("Could not connect to {}: {}", target_address, err))?;
 
             remote_stream
                 .write_all(&consumed_bytes[..])
                 .await
-                .map_err(|err| anyhow!("Failed to write initial data to {}: {}", addr, err))?;
+                .map_err(|err| {
+                    anyhow!(
+                        "Failed to write initial data to {}: {}",
+                        target_address,
+                        err
+                    )
+                })?;
 
             tokio::spawn(async move {
                 match tokio::io::copy_bidirectional(&mut stream, &mut remote_stream).await {
@@ -118,6 +124,6 @@ async fn forward_stream(stream: TcpStream, addr: SocketAddr) -> Result<(), Error
             Ok(())
         }
         Some(Err(err)) => Err(anyhow!("Failed to parse incoming request: {}", err)),
-        None => Err(anyhow!("Stream of {} is empty", addr)),
+        None => Err(anyhow!("Stream of {} is empty", source_address)),
     }
 }
