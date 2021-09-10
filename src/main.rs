@@ -15,7 +15,6 @@ mod addon;
 mod addon_instance;
 mod addon_manager;
 mod addon_socket;
-mod api_gateway;
 mod config;
 mod db;
 mod device;
@@ -25,6 +24,7 @@ mod model;
 mod platform;
 mod process_manager;
 mod rest_api;
+mod reverse_proxy;
 mod router;
 mod things_socket;
 mod user_config;
@@ -71,8 +71,8 @@ async fn main() {
     });
 
     tokio::spawn(async {
-        if let Err(err) = api_gateway::start().await {
-            error!("Failed to start api {:?}", err);
+        if let Err(err) = reverse_proxy::start().await {
+            error!("Failed to start reverse proxy {:?}", err);
         }
     });
 
