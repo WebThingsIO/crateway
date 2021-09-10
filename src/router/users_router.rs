@@ -25,8 +25,8 @@ struct UserCount {
 
 #[get("/count")]
 async fn get_user_count() -> Result<Json<UserCount>, status::Custom<String>> {
-    let count =
-        call!(Db.GetUserCount).to_rocket("Failed to obtain user count", Status::BadRequest)?;
+    let count = call!(Db.GetUserCount)
+        .to_rocket("Failed to obtain user count", Status::InternalServerError)?;
     Ok(Json(UserCount { count }))
 }
 
@@ -42,7 +42,7 @@ struct UserWithLoggedInState {
 async fn get_user_info(
     jwt: JSONWebToken,
 ) -> Result<Json<Vec<UserWithLoggedInState>>, status::Custom<String>> {
-    let users = call!(Db.GetUsers).to_rocket("Failed to get users", Status::BadRequest)?;
+    let users = call!(Db.GetUsers).to_rocket("Failed to get users", Status::InternalServerError)?;
     Ok(Json(
         users
             .into_iter()
@@ -56,8 +56,8 @@ async fn get_user_info(
 
 #[get("/<user_id>")]
 async fn get_user(user_id: i64, _jwt: JSONWebToken) -> Result<Json<User>, status::Custom<String>> {
-    let user =
-        call!(Db.GetUser::ById(user_id)).to_rocket("Failed to get user", Status::BadRequest)?;
+    let user = call!(Db.GetUser::ById(user_id))
+        .to_rocket("Failed to get user", Status::InternalServerError)?;
     if let Some(user) = user {
         Ok(Json(user))
     } else {
@@ -77,8 +77,8 @@ async fn post_user(
     data: Json<UserForCreate>,
     jwt: Result<JSONWebToken, &str>,
 ) -> Result<Json<Jwt>, status::Custom<String>> {
-    let count =
-        call!(Db.GetUserCount).to_rocket("Failed to obtain user count", Status::BadRequest)?;
+    let count = call!(Db.GetUserCount)
+        .to_rocket("Failed to obtain user count", Status::InternalServerError)?;
     if count > 0 && jwt.is_err() {
         return Err(status::Custom(
             Status::Unauthorized,
@@ -91,7 +91,7 @@ async fn post_user(
         name,
     } = data.0;
     let user = call!(Db.GetUser::ByEmail(email.to_owned()))
-        .to_rocket("Failed to get user".to_owned(), Status::BadRequest)?;
+        .to_rocket("Failed to get user".to_owned(), Status::InternalServerError)?;
     if user.is_some() {
         Err(status::Custom(
             Status::BadRequest,
@@ -99,10 +99,10 @@ async fn post_user(
         ))
     } else {
         let user = call!(Db.CreateUser(email.to_owned(), password, name))
-            .to_rocket("Failed to create user", Status::BadRequest)?;
+            .to_rocket("Failed to create user", Status::InternalServerError)?;
         let jwt = jwt::issue_token(user.id)
             .await
-            .to_rocket("Failed to issue token", Status::BadRequest)?;
+            .to_rocket("Failed to issue token", Status::InternalServerError)?;
         Ok(Json(Jwt { jwt }))
     }
 }
@@ -123,12 +123,12 @@ async fn put_user(
     _jwt: JSONWebToken,
 ) -> Result<status::NoContent, status::Custom<String>> {
     let user = call!(Db.GetUser::ById(user_id.to_owned()))
-        .to_rocket("Failed to get user", Status::BadRequest)?;
+        .to_rocket("Failed to get user", Status::InternalServerError)?;
     if let Some(mut user) = user {
-        if !user
-            .verify_password(&data.0.password)
-            .to_rocket("Failed to verify password hash", Status::BadRequest)?
-        {
+        if !user.verify_password(&data.0.password).to_rocket(
+            "Failed to verify password hash",
+            Status::InternalServerError,
+        )? {
             return Err(status::Custom(
                 Status::BadRequest,
                 "Passwords do not match".to_owned(),
@@ -137,12 +137,12 @@ async fn put_user(
 
         if let Some(new_password) = data.0.new_password {
             user.set_password(new_password)
-                .to_rocket("Failed to hash new password", Status::BadRequest)?
+                .to_rocket("Failed to hash new password", Status::InternalServerError)?
         }
         user.email = data.0.email;
         user.name = data.0.name;
 
-        call!(Db.EditUser(user)).to_rocket("Failed to edit user", Status::BadRequest)?;
+        call!(Db.EditUser(user)).to_rocket("Failed to edit user", Status::InternalServerError)?;
 
         Ok(status::NoContent)
     } else {
@@ -158,6 +158,7 @@ async fn delete_user(
     user_id: i64,
     _jwt: JSONWebToken,
 ) -> Result<status::NoContent, status::Custom<String>> {
-    call!(Db.DeleteUser(user_id)).to_rocket("Failed to delete user", Status::BadRequest)?;
+    call!(Db.DeleteUser(user_id))
+        .to_rocket("Failed to delete user", Status::InternalServerError)?;
     Ok(status::NoContent)
 }

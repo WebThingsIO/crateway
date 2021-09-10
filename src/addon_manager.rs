@@ -305,6 +305,20 @@ impl Handler<GetAddon> for AddonManager {
     }
 }
 
+#[message(result = "Result<bool, Error>")]
+pub struct HasAddon(pub String);
+
+#[async_trait]
+impl Handler<HasAddon> for AddonManager {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        HasAddon(id): HasAddon,
+    ) -> Result<bool, Error> {
+        Ok(self.installed_addons.contains_key(&id))
+    }
+}
+
 #[message(result = "Result<(), Error>")]
 pub struct UninstallAddon(pub String);
 
