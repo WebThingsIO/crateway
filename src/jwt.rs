@@ -15,7 +15,7 @@ use rocket::{
     request::{self, FromRequest, Outcome, Request},
 };
 use serde::{Deserialize, Serialize};
-use std::{env, ops::Deref};
+use std::ops::Deref;
 use uuid::Uuid;
 
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
@@ -93,36 +93,14 @@ impl<'r> FromRequest<'r> for JSONWebToken {
     type Error = &'static str;
 
     async fn from_request(request: &'r Request<'_>) -> request::Outcome<Self, Self::Error> {
-        if cfg!(test) && env::var("CHECK_JWT").is_err() {
-            return Outcome::Success(JSONWebToken(TokenData {
-                header: Header::default(),
-                claims: Claims {
-                    role: Role::UserToken,
-                    user: 0,
-                    exp: usize::MAX,
-                },
-            }));
-        }
         match extract_jwt(request) {
-            Some(token) => {
-                if cfg!(test) && env::var("CHECK_JWT").is_ok() {
-                    return Outcome::Success(JSONWebToken(TokenData {
-                        header: Header::default(),
-                        claims: Claims {
-                            role: Role::UserToken,
-                            user: 0,
-                            exp: usize::MAX,
-                        },
-                    }));
+            Some(token) => match decode_token(&token).await {
+                Ok(jwt) => Outcome::Success(JSONWebToken(jwt)),
+                Err(err) => {
+                    error!("Authorization failed: {:?}", err);
+                    Outcome::Failure((Status::Unauthorized, "Authorization invalid"))
                 }
-                match decode_token(&token).await {
-                    Ok(jwt) => Outcome::Success(JSONWebToken(jwt)),
-                    Err(err) => {
-                        error!("Authorization failed: {:?}", err);
-                        Outcome::Failure((Status::Unauthorized, "Authorization invalid"))
-                    }
-                }
-            }
+            },
             _ => Outcome::Failure((Status::Unauthorized, "Authorization missing")),
         }
     }
