@@ -1,8 +1,8 @@
 use crate::{
     addon::Addon,
     addon_manager::{
-        AddonManager, DisableAddon, EnableAddon, GetAddon, GetAddons, InstallAddonFromUrl,
-        RestartAddon, UninstallAddon,
+        AddonManager, DisableAddon, EnableAddon, GetAddon, GetAddons, HasAddon,
+        InstallAddonFromUrl, RestartAddon, UninstallAddon,
     },
     db::{Db, GetSetting, SetSetting},
     jwt::JSONWebToken,
@@ -36,8 +36,8 @@ pub fn routes() -> Vec<Route> {
 async fn get_addons(
     _jwt: JSONWebToken,
 ) -> Result<Json<Vec<AddonResponse>>, status::Custom<String>> {
-    let addons =
-        call!(AddonManager.GetAddons).to_rocket("Failed to get addons", Status::BadRequest)?;
+    let addons = call!(AddonManager.GetAddons)
+        .to_rocket("Failed to get addons", Status::InternalServerError)?;
     Ok(Json(
         addons.values().cloned().map(AddonResponse::from).collect(),
     ))
@@ -77,14 +77,23 @@ async fn put_addon_config(
     data: Json<AddonConfig>,
     _jwt: JSONWebToken,
 ) -> Result<Json<AddonConfig>, status::Custom<String>> {
+    if !call!(AddonManager.HasAddon(addon_id.to_owned())).to_rocket(
+        "Failed to check whether add-on is known".to_owned(),
+        Status::InternalServerError,
+    )? {
+        return Err(status::Custom(
+            Status::BadRequest,
+            "Unknown add-on".to_owned(),
+        ));
+    }
     let config_key = format!("addons.{}.config", addon_id);
     call!(Db.SetSetting(config_key, data.0.config.clone())).to_rocket(
         format!("Failed to update config for addon {}", addon_id),
-        Status::BadRequest,
+        Status::InternalServerError,
     )?;
     call!(AddonManager.RestartAddon(addon_id.to_owned())).to_rocket(
         format!("Failed to restart addon {}", addon_id),
-        Status::BadRequest,
+        Status::InternalServerError,
     )?;
     Ok(Json(data.0))
 }
@@ -110,9 +119,18 @@ async fn get_addon_config(
     addon_id: String,
     _jwt: JSONWebToken,
 ) -> Result<Json<serde_json::Value>, status::Custom<String>> {
+    if !call!(AddonManager.HasAddon(addon_id.to_owned())).to_rocket(
+        "Failed to check whether add-on is known".to_owned(),
+        Status::InternalServerError,
+    )? {
+        return Err(status::Custom(
+            Status::BadRequest,
+            "Unknown add-on".to_owned(),
+        ));
+    }
     let config_key = format!("addons.{}.config", addon_id);
     let config = call!(Db.GetSetting(config_key, PhantomData))
-        .to_rocket("Failed to get addon config", Status::BadRequest)?;
+        .to_rocket("Failed to get addon config", Status::InternalServerError)?;
     Ok(Json(config))
 }
 
@@ -124,7 +142,7 @@ async fn get_addon_license(
     let addon_dir = user_config::ADDONS_DIR.join(addon_id.to_owned());
     let entries = fs::read_dir(addon_dir).to_rocket(
         "Failed to obtain license: Failed to access addon directory",
-        Status::BadRequest,
+        Status::InternalServerError,
     )?;
     let files: Vec<_> = entries
         .filter_map(|res| res.ok())
@@ -142,13 +160,13 @@ async fn get_addon_license(
         .collect();
     if files.is_empty() {
         return Err(status::Custom(
-            Status::BadRequest,
+            Status::InternalServerError,
             "License not found".to_owned(),
         ));
     }
     fs::read_to_string(files[0].to_owned()).to_rocket(
         format!("Failed to read license file for addon {}", addon_id),
-        Status::BadRequest,
+        Status::InternalServerError,
     )
 }
 
@@ -157,8 +175,17 @@ async fn delete_addon(
     addon_id: String,
     _jwt: JSONWebToken,
 ) -> Result<status::NoContent, status::Custom<String>> {
+    if !call!(AddonManager.HasAddon(addon_id.to_owned())).to_rocket(
+        "Failed to check whether add-on is known".to_owned(),
+        Status::InternalServerError,
+    )? {
+        return Err(status::Custom(
+            Status::BadRequest,
+            "Unknown add-on".to_owned(),
+        ));
+    }
     call!(AddonManager.UninstallAddon(addon_id.to_owned()))
-        .to_rocket("Failed to uninstall add-on", Status::BadRequest)?;
+        .to_rocket("Failed to uninstall add-on", Status::InternalServerError)?;
     Ok(status::NoContent)
 }
 
@@ -178,11 +205,11 @@ async fn post_addons(
     let addon_id = inst.id.clone();
     call!(AddonManager.InstallAddonFromUrl(inst.id, inst.url, inst.checksum, true)).to_rocket(
         format!("Failed to install add-on {}", addon_id.clone()),
-        Status::BadRequest,
+        Status::InternalServerError,
     )?;
     let addon = call!(AddonManager.GetAddon(addon_id.to_owned())).to_rocket(
         format!("Failed to get addon {}", addon_id),
-        Status::BadRequest,
+        Status::InternalServerError,
     )?;
     Ok(Json(AddonResponse::from(addon)))
 }
@@ -203,11 +230,11 @@ async fn patch_addon(
     call!(AddonManager.InstallAddonFromUrl(addon_id.clone(), inst.url, inst.checksum, false))
         .to_rocket(
             format!("Failed to update add-on {}", addon_id.clone()),
-            Status::BadRequest,
+            Status::InternalServerError,
         )?;
     let addon = call!(AddonManager.GetAddon(addon_id.to_owned())).to_rocket(
         format!("Failed to get addon {}", addon_id),
-        Status::BadRequest,
+        Status::InternalServerError,
     )?;
     Ok(Json(AddonResponse::from(addon)))
 }

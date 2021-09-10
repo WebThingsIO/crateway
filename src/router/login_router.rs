@@ -20,7 +20,7 @@ pub struct Login {
 #[post("/", data = "<data>")]
 async fn login(data: Json<Login>) -> Result<Json<Jwt>, status::Custom<String>> {
     let user = call!(Db.GetUser::ByEmail(data.0.email))
-        .to_rocket("Failed to get user", Status::BadRequest)?;
+        .to_rocket("Failed to get user", Status::InternalServerError)?;
     if let Some(user) = user {
         if !user
             .verify_password(&data.0.password)
@@ -34,7 +34,7 @@ async fn login(data: Json<Login>) -> Result<Json<Jwt>, status::Custom<String>> {
 
         let jwt = jwt::issue_token(user.id)
             .await
-            .to_rocket("Failed to issue token", Status::BadRequest)?;
+            .to_rocket("Failed to issue token", Status::InternalServerError)?;
         Ok(Json(Jwt { jwt }))
     } else {
         Err(status::Custom(
