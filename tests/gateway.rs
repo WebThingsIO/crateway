@@ -1,5 +1,5 @@
-use async_process::{Child, ChildStdout, Command, Stdio};
-use futures::{channel::mpsc, io::BufReader, AsyncBufReadExt, StreamExt};
+use async_process::{Child, Command, Stdio};
+use futures::{channel::mpsc, io::BufReader, AsyncBufReadExt, AsyncRead, StreamExt};
 use regex::Regex;
 use reqwest::{Client, Method, RequestBuilder, Response, StatusCode};
 use rocket::async_trait;
@@ -42,13 +42,21 @@ impl Gateway {
 
         let (tx, mut rx) = mpsc::unbounded();
 
+        let tx1 = tx.clone();
         let stream = child.stdout.take().expect("Take stdout");
         forward_stream(stream, move |line| {
             if let Some(url) = try_extract_base_url(line) {
-                tx.unbounded_send(url).expect("Send base url");
+                tx1.unbounded_send(url).expect("Send base url");
             }
-        })
-        .await;
+        });
+
+        let tx2 = tx.clone();
+        let stream = child.stderr.take().expect("Take stderr");
+        forward_stream(stream, move |line| {
+            if let Some(url) = try_extract_base_url(line) {
+                tx2.unbounded_send(url).expect("Send base url");
+            }
+        });
 
         let base_url = rx.next().await.expect("Receive base url");
 
@@ -132,14 +140,17 @@ fn create_dirs() -> Dirs {
 fn start_gateway(dirs: &Dirs) -> Child {
     Command::new("./target/debug/crateway")
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .env("WEBTHINGS_HOME", dirs.home_dir().into_os_string())
         .env("WEBTHINGS_UI", dirs.ui_dir().into_os_string())
         .spawn()
         .expect("Start gateway process")
 }
 
-async fn forward_stream(stream: ChildStdout, f: impl Fn(String) + std::marker::Send + 'static) {
+fn forward_stream<T: AsyncRead + Unpin + Send + 'static>(
+    stream: T,
+    f: impl Fn(String) + std::marker::Send + 'static,
+) {
     tokio::spawn(async move {
         let mut lines = BufReader::new(stream).lines();
         while let Some(Ok(line)) = lines.next().await {
