@@ -145,11 +145,14 @@ fn create_dirs() -> Dirs {
 }
 
 async fn start_gateway(dirs: &Dirs) -> Child {
-    Command::new("cargo")
-        .args(&["build", "--features", "debug"])
-        .status()
-        .await
-        .expect("Build gateway for debug");
+    #[cfg(not(feature = "debug"))]
+    {
+        Command::new("cargo")
+            .args(&["build", "--features", "debug"])
+            .status()
+            .await
+            .expect("Build gateway for debug");
+    }
     Command::new("./target/debug/crateway")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

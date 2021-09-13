@@ -14,6 +14,7 @@ pub(crate) mod users_router;
 use rocket::{Build, Rocket};
 
 pub fn mount(rocket: Rocket<Build>) -> Rocket<Build> {
+    #[allow(unused_mut)]
     let mut rocket = rocket
         .mount("/addons/", addons_router::routes())
         .mount("/extensions/", extensions_router::routes())
@@ -22,12 +23,14 @@ pub fn mount(rocket: Rocket<Build>) -> Rocket<Build> {
         .mount("/settings/", settings_router::routes())
         .mount("/things/", things_router::routes())
         .mount("/users/", users_router::routes());
-    if cfg!(feature = "debug") {
+    #[cfg(feature = "debug")]
+    {
         rocket = rocket.mount("/", routes![exit]);
     }
     rocket
 }
 
+#[cfg(feature = "debug")]
 #[get("/exit")]
 fn exit() {
     std::process::exit(0)
