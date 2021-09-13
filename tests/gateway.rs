@@ -45,7 +45,7 @@ impl Drop for Gateway {
 impl Gateway {
     pub async fn startup() -> Self {
         let dirs = create_dirs();
-        let mut child = start_gateway(&dirs);
+        let mut child = start_gateway(&dirs).await;
 
         let (tx, mut rx) = mpsc::unbounded();
 
@@ -144,7 +144,12 @@ fn create_dirs() -> Dirs {
     Dirs { home_dir, ui_dir }
 }
 
-fn start_gateway(dirs: &Dirs) -> Child {
+async fn start_gateway(dirs: &Dirs) -> Child {
+    Command::new("cargo")
+        .args(&["build", "--features", "debug"])
+        .status()
+        .await
+        .expect("Build gateway for debug");
     Command::new("./target/debug/crateway")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
