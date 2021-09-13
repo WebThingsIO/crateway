@@ -31,7 +31,14 @@ pub struct Gateway {
 
 impl Drop for Gateway {
     fn drop(&mut self) {
-        self.child.kill().expect("Kill gateway process")
+        println!("Requesting gateway exit");
+        std::process::Command::new("curl")
+            .arg(format!("{}:{}/shutdown", self.base_url, self.http_port))
+            .output()
+            .unwrap();
+        println!("Waiting for gateway exit");
+        futures::executor::block_on(self.child.status()).expect("Wait for child to exit");
+        println!("Gateway exited");
     }
 }
 

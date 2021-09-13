@@ -22,4 +22,10 @@ pub fn mount(rocket: Rocket<Build>) -> Rocket<Build> {
         .mount("/settings/", settings_router::routes())
         .mount("/things/", things_router::routes())
         .mount("/users/", users_router::routes())
+        .mount("/", routes![shutdown])
+}
+
+#[get("/shutdown")]
+fn shutdown() {
+    std::process::exit(0)
 }
