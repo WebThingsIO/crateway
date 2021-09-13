@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -13,7 +13,7 @@ pub struct Thing {
 }
 
 impl Thing {
-    pub fn from_id_and_json(id: &str, mut description: serde_json::Value) -> Result<Self, Error> {
+    pub fn from_id_and_json(id: &str, mut description: serde_json::Value) -> Result<Self> {
         if let Value::Object(ref mut map) = description {
             map.insert("id".to_owned(), Value::String(id.to_owned()));
         }
@@ -30,7 +30,7 @@ pub struct User {
 }
 
 impl User {
-    pub fn new(id: i64, email: String, password: String, name: String) -> Result<Self, Error> {
+    pub fn new(id: i64, email: String, password: String, name: String) -> Result<Self> {
         let mut user = User {
             id,
             email,
@@ -41,12 +41,12 @@ impl User {
         Ok(user)
     }
 
-    pub fn set_password(&mut self, password: String) -> Result<(), Error> {
+    pub fn set_password(&mut self, password: String) -> Result<()> {
         self.password = bcrypt::hash(password, bcrypt::DEFAULT_COST)?;
         Ok(())
     }
 
-    pub fn verify_password(&self, password: &str) -> Result<bool, Error> {
+    pub fn verify_password(&self, password: &str) -> Result<bool> {
         bcrypt::verify(password, &self.password).context(anyhow!("Failed to verify password"))
     }
 }

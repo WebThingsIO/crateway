@@ -2,7 +2,7 @@ use crate::{
     db::{CreateJwt, Db, GetJwtPublicKeyByKeyId},
     macros::call,
 };
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Context, Result};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use openssl::{
@@ -45,7 +45,7 @@ impl JSONWebToken {
     }
 }
 
-async fn decode_token(token: &str) -> Result<TokenData<Claims>, Error> {
+async fn decode_token(token: &str) -> Result<TokenData<Claims>> {
     let kid = jsonwebtoken::decode_header(token)?
         .kid
         .ok_or_else(|| anyhow!("Failed to obtain kid"))?;
@@ -106,7 +106,7 @@ impl<'r> FromRequest<'r> for JSONWebToken {
     }
 }
 
-pub async fn issue_token(user_id: i64) -> Result<String, Error> {
+pub async fn issue_token(user_id: i64) -> Result<String> {
     let (pub_key, priv_key) = generate_key_pair()?;
     let claims = Claims {
         user: user_id,
@@ -125,7 +125,7 @@ pub async fn issue_token(user_id: i64) -> Result<String, Error> {
     Ok(token)
 }
 
-fn generate_key_pair() -> Result<(Vec<u8>, Vec<u8>), Error> {
+fn generate_key_pair() -> Result<(Vec<u8>, Vec<u8>)> {
     let curve = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1)?;
     let ec = EcKey::generate(&curve)?;
     let pkey = PKey::from_ec_key(ec)?;
