@@ -33,7 +33,7 @@ impl Drop for Gateway {
     fn drop(&mut self) {
         println!("Requesting gateway exit");
         std::process::Command::new("curl")
-            .arg(format!("{}:{}/shutdown", self.base_url, self.http_port))
+            .arg(format!("{}:{}/exit", self.base_url, self.http_port))
             .output()
             .unwrap();
         println!("Waiting for gateway exit");

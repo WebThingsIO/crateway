@@ -14,18 +14,21 @@ pub(crate) mod users_router;
 use rocket::{Build, Rocket};
 
 pub fn mount(rocket: Rocket<Build>) -> Rocket<Build> {
-    rocket
+    let mut rocket = rocket
         .mount("/addons/", addons_router::routes())
         .mount("/extensions/", extensions_router::routes())
         .mount("/login/", login_router::routes())
         .mount("/ping/", ping_router::routes())
         .mount("/settings/", settings_router::routes())
         .mount("/things/", things_router::routes())
-        .mount("/users/", users_router::routes())
-        .mount("/", routes![shutdown])
+        .mount("/users/", users_router::routes());
+    if cfg!(feature = "debug") {
+        rocket = rocket.mount("/", routes![exit]);
+    }
+    rocket
 }
 
-#[get("/shutdown")]
-fn shutdown() {
+#[get("/exit")]
+fn exit() {
     std::process::exit(0)
 }
