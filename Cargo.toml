@@ -52,3 +52,6 @@ rev = "f5fc0ed"
 rusty-fork = "0.3.0"
 serial_test = "0.4.0"
 strip-ansi-escapes = "0.1.1"
+
+[features]
+debug = []
