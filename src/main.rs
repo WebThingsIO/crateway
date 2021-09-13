@@ -29,6 +29,9 @@ mod router;
 mod things_socket;
 mod user_config;
 
+#[cfg(test)]
+mod tests_common;
+
 use crate::{
     addon_manager::{AddonManager, LoadAddons},
     macros::call,

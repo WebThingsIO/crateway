@@ -436,268 +436,233 @@ fn create_tables(conn: &Connection) {
 
 #[cfg(test)]
 mod tests {
-    extern crate rusty_fork;
-    extern crate serial_test;
+    extern crate two_rusty_forks;
     use super::*;
-    use crate::macros::call;
-    use rusty_fork::rusty_fork_test;
-    use serial_test::serial;
-    use std::{env, fs};
-    use tokio::runtime::Runtime;
+    use crate::{macros::call, tests_common::setup};
+    use two_rusty_forks::test_fork;
 
-    #[allow(unused_must_use)]
-    fn setup() {
-        let dir = env::temp_dir().join(".webthingsio");
-        fs::remove_dir_all(&dir); // We really don't want to handle this result, since we don't care if the directory never existed
-        env::set_var("WEBTHINGS_HOME", dir);
+    #[async_test]
+    #[test_fork]
+    async fn test_create_things() {
+        let _ = setup();
+        call!(Db.CreateThing("test1".to_owned(), serde_json::json!({}))).unwrap();
+        call!(Db.CreateThing("test2".to_owned(), serde_json::json!({}))).unwrap();
+        let things = call!(Db.GetThings).unwrap();
+        assert_eq!(things.len(), 2);
+        assert_eq!(
+            things[0],
+            Thing {
+                id: "test1".to_owned()
+            }
+        );
+        assert_eq!(
+            things[1],
+            Thing {
+                id: "test2".to_owned()
+            }
+        );
     }
 
-    rusty_fork_test! {
-        #[test]
-        #[serial]
-        fn test_create_things() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                call!(Db.CreateThing("test1".to_owned(), serde_json::json!({}))).unwrap();
-                call!(Db.CreateThing("test2".to_owned(), serde_json::json!({}))).unwrap();
-                let things = call!(Db.GetThings).unwrap();
-                assert_eq!(things.len(), 2);
-                assert_eq!(
-                    things[0],
-                    Thing {
-                        id: "test1".to_owned()
-                    }
-                );
-                assert_eq!(
-                    things[1],
-                    Thing {
-                        id: "test2".to_owned()
-                    }
-                );
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_get_thing() {
+        let _ = setup();
+        call!(Db.CreateThing("test".to_owned(), serde_json::json!({}))).unwrap();
+        let thing = call!(Db.GetThing("test".to_owned())).unwrap();
+        assert_eq!(
+            thing,
+            Some(Thing {
+                id: "test".to_owned()
+            })
+        );
+    }
 
-        #[test]
-        #[serial]
-        fn test_get_thing() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                call!(Db.CreateThing("test".to_owned(), serde_json::json!({}))).unwrap();
-                let thing = call!(Db.GetThing("test".to_owned())).unwrap();
-                assert_eq!(
-                    thing,
-                    Some(Thing {
-                        id: "test".to_owned()
-                    })
-                );
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_get_user_by_id() {
+        let _ = setup();
+        let created_user = call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        let user = call!(Db.GetUser::ById(created_user.id)).unwrap().unwrap();
+        assert_eq!(user.id, created_user.id);
+        assert_eq!(user.email, "test@test");
+        assert!(user.verify_password("password").unwrap());
+        assert_eq!(user.name, "Tester");
+    }
 
-        #[test]
-        #[serial]
-        fn test_get_user_by_id() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                let created_user = call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                let user = call!(Db.GetUser::ById(created_user.id)).unwrap().unwrap();
-                assert_eq!(user.id, created_user.id);
-                assert_eq!(user.email, "test@test");
-                assert!(user.verify_password("password").unwrap());
-                assert_eq!(user.name, "Tester");
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_get_user_by_email() {
+        let _ = setup();
+        let created_user = call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        let user = call!(Db.GetUser::ByEmail(created_user.email))
+            .unwrap()
+            .unwrap();
+        assert_eq!(user.id, created_user.id);
+        assert_eq!(user.email, "test@test");
+        assert!(user.verify_password("password").unwrap());
+        assert_eq!(user.name, "Tester");
+    }
 
-        #[test]
-        #[serial]
-        fn test_get_user_by_email() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                let created_user = call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                let user = call!(Db.GetUser::ByEmail(created_user.email))
-                    .unwrap()
-                    .unwrap();
-                assert_eq!(user.id, created_user.id);
-                assert_eq!(user.email, "test@test");
-                assert!(user.verify_password("password").unwrap());
-                assert_eq!(user.name, "Tester");
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_edit_user() {
+        let _ = setup();
+        let created_user = call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        call!(Db.EditUser(
+            User::new(
+                created_user.id,
+                "foo@bar".to_owned(),
+                "test1234".to_owned(),
+                "Peter".to_owned()
+            )
+            .unwrap()
+        ))
+        .unwrap();
+        let edited_user = call!(Db.GetUser::ById(created_user.id)).unwrap().unwrap();
+        assert_eq!(edited_user.id, created_user.id);
+        assert_eq!(edited_user.email, "foo@bar");
+        assert!(edited_user.verify_password("test1234").unwrap());
+        assert_eq!(edited_user.name, "Peter");
+    }
 
-        #[test]
-        #[serial]
-        fn test_edit_user() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                let created_user = call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                call!(Db.EditUser(
-                    User::new(
-                        created_user.id,
-                        "foo@bar".to_owned(),
-                        "test1234".to_owned(),
-                        "Peter".to_owned()
-                    )
-                    .unwrap()
-                ))
-                .unwrap();
-                let edited_user = call!(Db.GetUser::ById(created_user.id)).unwrap().unwrap();
-                assert_eq!(edited_user.id, created_user.id);
-                assert_eq!(edited_user.email, "foo@bar");
-                assert!(edited_user.verify_password("test1234").unwrap());
-                assert_eq!(edited_user.name, "Peter");
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_delete_user() {
+        let _ = setup();
+        let created_user = call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        assert!(call!(Db.DeleteUser(created_user.id)).is_ok());
+    }
 
-        #[test]
-        #[serial]
-        fn test_delete_user() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                let created_user = call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                assert!(call!(Db.DeleteUser(created_user.id)).is_ok());
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_get_users() {
+        let _ = setup();
+        call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        call!(Db.CreateUser(
+            "foo@bar".to_owned(),
+            "test1234".to_owned(),
+            "Peter".to_owned()
+        ))
+        .unwrap();
+        let users = call!(Db.GetUsers).unwrap();
+        assert_eq!(users.len(), 2);
+        assert!(users.iter().any(|user| {
+            user.email == "test@test"
+                && user.verify_password("password").unwrap()
+                && user.name == "Tester"
+        }));
+        assert!(users.iter().any(|user| {
+            user.email == "foo@bar"
+                && user.verify_password("test1234").unwrap()
+                && user.name == "Peter"
+        }));
+    }
 
-        #[test]
-        #[serial]
-        fn test_get_users() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                call!(Db.CreateUser(
-                    "foo@bar".to_owned(),
-                    "test1234".to_owned(),
-                    "Peter".to_owned()
-                ))
-                .unwrap();
-                let users = call!(Db.GetUsers).unwrap();
-                assert_eq!(users.len(), 2);
-                assert!(users.iter().any(|user| {
-                    user.email == "test@test"
-                        && user.verify_password("password").unwrap()
-                        && user.name == "Tester"
-                }));
-                assert!(users.iter().any(|user| {
-                    user.email == "foo@bar"
-                        && user.verify_password("test1234").unwrap()
-                        && user.name == "Peter"
-                }));
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_get_user_count() {
+        let _ = setup();
+        call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        call!(Db.CreateUser(
+            "foo@bar".to_owned(),
+            "test1234".to_owned(),
+            "Peter".to_owned()
+        ))
+        .unwrap();
+        assert_eq!(call!(Db.GetUserCount).unwrap(), 2);
+    }
 
-        #[test]
-        #[serial]
-        fn test_get_user_count() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                call!(Db.CreateUser(
-                    "foo@bar".to_owned(),
-                    "test1234".to_owned(),
-                    "Peter".to_owned()
-                ))
-                .unwrap();
-                assert_eq!(call!(Db.GetUserCount).unwrap(), 2);
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_get_jwt_public_key() {
+        let _ = setup();
+        let user = call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        call!(Db.CreateJwt("1234".to_owned(), user.id, "key".to_owned())).unwrap();
+        assert_eq!(
+            call!(Db.GetJwtPublicKeyByKeyId("1234".to_owned())).unwrap(),
+            "key"
+        );
+    }
 
-        #[test]
-        #[serial]
-        fn test_get_jwt_public_key() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                let user = call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                call!(Db.CreateJwt("1234".to_owned(), user.id, "key".to_owned())).unwrap();
-                assert_eq!(
-                    call!(Db.GetJwtPublicKeyByKeyId("1234".to_owned())).unwrap(),
-                    "key"
-                );
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_get_jwts_by_user() {
+        let _ = setup();
+        let user1 = call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        let user2 = call!(Db.CreateUser(
+            "foo@bar".to_owned(),
+            "test1234".to_owned(),
+            "Peter".to_owned()
+        ))
+        .unwrap();
+        call!(Db.CreateJwt("1234".to_owned(), user1.id, "key1".to_owned())).unwrap();
+        call!(Db.CreateJwt("2345".to_owned(), user1.id, "key2".to_owned())).unwrap();
+        call!(Db.CreateJwt("3456".to_owned(), user2.id, "key3".to_owned())).unwrap();
+        assert_eq!(call!(Db.GetJwtsByUser(user1.id)).unwrap().len(), 2);
+        assert_eq!(call!(Db.GetJwtsByUser(user2.id)).unwrap().len(), 1);
+    }
 
-        #[test]
-        #[serial]
-        fn test_get_jwts_by_user() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                let user1 = call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                let user2 = call!(Db.CreateUser(
-                    "foo@bar".to_owned(),
-                    "test1234".to_owned(),
-                    "Peter".to_owned()
-                ))
-                .unwrap();
-                call!(Db.CreateJwt("1234".to_owned(), user1.id, "key1".to_owned())).unwrap();
-                call!(Db.CreateJwt("2345".to_owned(), user1.id, "key2".to_owned())).unwrap();
-                call!(Db.CreateJwt("3456".to_owned(), user2.id, "key3".to_owned())).unwrap();
-                assert_eq!(call!(Db.GetJwtsByUser(user1.id)).unwrap().len(), 2);
-                assert_eq!(call!(Db.GetJwtsByUser(user2.id)).unwrap().len(), 1);
-            });
-        }
-
-        #[test]
-        #[serial]
-        fn test_delete_user_deletes_jwts() {
-            Runtime::new().unwrap().block_on(async {
-                setup();
-                let user1 = call!(Db.CreateUser(
-                    "test@test".to_owned(),
-                    "password".to_owned(),
-                    "Tester".to_owned()
-                ))
-                .unwrap();
-                let user2 = call!(Db.CreateUser(
-                    "foo@bar".to_owned(),
-                    "test1234".to_owned(),
-                    "Peter".to_owned()
-                ))
-                .unwrap();
-                call!(Db.CreateJwt("1234".to_owned(), user1.id, "key1".to_owned())).unwrap();
-                call!(Db.CreateJwt("2345".to_owned(), user1.id, "key2".to_owned())).unwrap();
-                call!(Db.CreateJwt("3456".to_owned(), user2.id, "key3".to_owned())).unwrap();
-                call!(Db.DeleteUser(user1.id)).unwrap();
-                assert_eq!(call!(Db.GetJwtsByUser(user1.id)).unwrap().len(), 0);
-                assert_eq!(call!(Db.GetJwtsByUser(user2.id)).unwrap().len(), 1);
-            });
-        }
+    #[async_test]
+    #[test_fork]
+    async fn test_delete_user_deletes_jwts() {
+        let _ = setup();
+        let user1 = call!(Db.CreateUser(
+            "test@test".to_owned(),
+            "password".to_owned(),
+            "Tester".to_owned()
+        ))
+        .unwrap();
+        let user2 = call!(Db.CreateUser(
+            "foo@bar".to_owned(),
+            "test1234".to_owned(),
+            "Peter".to_owned()
+        ))
+        .unwrap();
+        call!(Db.CreateJwt("1234".to_owned(), user1.id, "key1".to_owned())).unwrap();
+        call!(Db.CreateJwt("2345".to_owned(), user1.id, "key2".to_owned())).unwrap();
+        call!(Db.CreateJwt("3456".to_owned(), user2.id, "key3".to_owned())).unwrap();
+        call!(Db.DeleteUser(user1.id)).unwrap();
+        assert_eq!(call!(Db.GetJwtsByUser(user1.id)).unwrap().len(), 0);
+        assert_eq!(call!(Db.GetJwtsByUser(user2.id)).unwrap().len(), 1);
     }
 }
