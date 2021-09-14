@@ -4,7 +4,7 @@
 
 use crate::macros::send;
 use crate::things_socket::{PropertyStatusMessage, ThingsMessage, ThingsMessages, ThingsSocket};
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Result};
 use log::debug;
 use rocket::serde::json::Value;
 use webthings_gateway_ipc_types::{Device as DeviceDescription, Property};
@@ -15,7 +15,7 @@ pub struct Device {
 }
 
 impl Device {
-    pub(crate) async fn update_property(&mut self, new_property: Property) -> Result<(), Error> {
+    pub(crate) async fn update_property(&mut self, new_property: Property) -> Result<()> {
         let id = self.description.id.clone();
 
         let name = new_property

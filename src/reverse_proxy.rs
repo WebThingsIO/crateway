@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::config::CONFIG;
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Context, Error, Result};
 use bytes::BytesMut;
 use futures::StreamExt;
 use httparse::Request;
@@ -56,7 +56,7 @@ impl Decoder for HttpTunnelCodec {
     }
 }
 
-pub async fn start() -> Result<(), Error> {
+pub async fn start() -> Result<()> {
     let listener = TcpListener::bind(format!("127.0.0.1:{}", CONFIG.ports.api)).await?;
 
     loop {
@@ -69,7 +69,7 @@ pub async fn start() -> Result<(), Error> {
     }
 }
 
-async fn forward_stream(stream: TcpStream, source_address: SocketAddr) -> Result<(), Error> {
+async fn forward_stream(stream: TcpStream, source_address: SocketAddr) -> Result<()> {
     let codec = HttpTunnelCodec;
     let mut stream = codec.framed(stream);
 

@@ -6,7 +6,7 @@
 use crate::addon_manager::AddonManager;
 use crate::macros::send;
 use crate::{adapter::Adapter, addon_manager::AddonStarted};
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Result};
 use futures::{stream::SplitSink, SinkExt};
 use log::debug;
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ impl AddonInstance {
         }
     }
 
-    fn get_adapter_mut(&mut self, id: &str) -> Result<&mut Adapter, Error> {
+    fn get_adapter_mut(&mut self, id: &str) -> Result<&mut Adapter> {
         self.adapters
             .get_mut(id)
             .ok_or_else(|| anyhow!("No adapter with id {} found", id))
@@ -41,12 +41,12 @@ impl AddonInstance {
 
 impl Actor for AddonInstance {}
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct Msg(pub Message);
 
 #[async_trait]
 impl Handler<Msg> for AddonInstance {
-    async fn handle(&mut self, ctx: &mut Context<Self>, Msg(msg): Msg) -> Result<(), Error> {
+    async fn handle(&mut self, ctx: &mut Context<Self>, Msg(msg): Msg) -> Result<()> {
         debug!("Received {:?}", msg);
 
         match msg {

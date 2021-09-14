@@ -5,7 +5,7 @@
 use crate::device::Device;
 use crate::macros::send;
 use crate::things_socket::{ConnectedMessage, ThingsMessage, ThingsMessages, ThingsSocket};
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use webthings_gateway_ipc_types::{Device as DeviceDescription, Property as PropertyDescription};
 
@@ -41,13 +41,13 @@ impl Adapter {
         &mut self,
         device_id: String,
         property: PropertyDescription,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let device = self.get_device(&device_id)?;
 
         device.update_property(property).await
     }
 
-    pub async fn set_connect_state(&mut self, device_id: String, state: bool) -> Result<(), Error> {
+    pub async fn set_connect_state(&mut self, device_id: String, state: bool) -> Result<()> {
         let device = self.get_device(&device_id)?;
         device.set_connect_state(state);
 
@@ -58,7 +58,7 @@ impl Adapter {
         Ok(())
     }
 
-    fn get_device(&mut self, device_id: &str) -> Result<&mut Device, Error> {
+    fn get_device(&mut self, device_id: &str) -> Result<&mut Device> {
         let id = self.id.clone();
         self.devices
             .get_mut(device_id)

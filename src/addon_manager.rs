@@ -11,7 +11,7 @@ use crate::{
     process_manager::{ProcessManager, StartAddon, StopAddon},
     user_config,
 };
-use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
+use anyhow::{anyhow, bail, Context as AnyhowContext, Result};
 use flate2::read::GzDecoder;
 use fs_extra::{dir::CopyOptions, move_items};
 use log::{error, info};
@@ -36,7 +36,7 @@ pub struct AddonManager {
 }
 
 impl AddonManager {
-    async fn load_addon(&mut self, path: PathBuf) -> Result<(), Error> {
+    async fn load_addon(&mut self, path: PathBuf) -> Result<()> {
         let file = fs::File::open(path.join("manifest.json")).context(anyhow!(
             "Could not open manifest.json file in {:?} found",
             path,
@@ -64,11 +64,11 @@ impl AddonManager {
         Ok(())
     }
 
-    async fn unload_addon(&mut self, id: String) -> Result<(), Error> {
+    async fn unload_addon(&mut self, id: String) -> Result<()> {
         call!(ProcessManager.StopAddon(id.clone()))
     }
 
-    async fn addon_enabled(&mut self, id: String) -> Result<bool, Error> {
+    async fn addon_enabled(&mut self, id: String) -> Result<bool> {
         let addon = self
             .installed_addons
             .get(&id)
@@ -80,7 +80,7 @@ impl AddonManager {
         package_id: String,
         package_path: PathBuf,
         enable: bool,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if !package_path.is_file() {
             return Err(anyhow!(format!(
                 "Cannot extract invalid path: {:?}",
@@ -122,7 +122,7 @@ impl AddonManager {
         Ok(())
     }
 
-    async fn uninstall_addon(&mut self, package_id: String, disable: bool) -> Result<(), Error> {
+    async fn uninstall_addon(&mut self, package_id: String, disable: bool) -> Result<()> {
         if let Err(err) = self.unload_addon(package_id.to_owned()).await {
             error!("Failed to unload {} properly: {:?}", package_id, err);
         }
@@ -147,7 +147,7 @@ impl Actor for AddonManager {}
 
 impl Service for AddonManager {}
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct LoadAddons(pub PathBuf);
 
 #[async_trait]
@@ -156,7 +156,7 @@ impl Handler<LoadAddons> for AddonManager {
         &mut self,
         _ctx: &mut Context<Self>,
         LoadAddons(addon_dir): LoadAddons,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         info!("Loading addons from {:?}", addon_dir);
         let entries = fs::read_dir(addon_dir)
             .context(anyhow!("Could not load addons"))?
@@ -178,7 +178,7 @@ impl Handler<LoadAddons> for AddonManager {
     }
 }
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct RestartAddon(pub String);
 
 #[async_trait]
@@ -187,7 +187,7 @@ impl Handler<RestartAddon> for AddonManager {
         &mut self,
         _ctx: &mut Context<Self>,
         RestartAddon(id): RestartAddon,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         self.unload_addon(id.to_owned()).await?;
         if self.addon_enabled(id.to_owned()).await? {
             self.load_addon(user_config::ADDONS_DIR.join(id)).await?;
@@ -216,7 +216,7 @@ impl Handler<AddonStopped> for AddonManager {
     }
 }
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct EnableAddon(pub String);
 
 #[async_trait]
@@ -225,7 +225,7 @@ impl Handler<EnableAddon> for AddonManager {
         &mut self,
         _ctx: &mut Context<Self>,
         EnableAddon(id): EnableAddon,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let addon = self
             .installed_addons
             .get_mut(&id)
@@ -245,7 +245,7 @@ impl Handler<EnableAddon> for AddonManager {
     }
 }
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct DisableAddon(pub String);
 
 #[async_trait]
@@ -254,7 +254,7 @@ impl Handler<DisableAddon> for AddonManager {
         &mut self,
         _ctx: &mut Context<Self>,
         DisableAddon(id): DisableAddon,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let addon = self
             .installed_addons
             .get_mut(&id)
@@ -274,7 +274,7 @@ impl Handler<DisableAddon> for AddonManager {
     }
 }
 
-#[message(result = "Result<HashMap<String, Addon>, Error>")]
+#[message(result = "Result<HashMap<String, Addon>>")]
 pub struct GetAddons;
 
 #[async_trait]
@@ -283,21 +283,17 @@ impl Handler<GetAddons> for AddonManager {
         &mut self,
         _ctx: &mut Context<Self>,
         _msg: GetAddons,
-    ) -> Result<HashMap<String, Addon>, Error> {
+    ) -> Result<HashMap<String, Addon>> {
         Ok(self.installed_addons.clone())
     }
 }
 
-#[message(result = "Result<Addon, Error>")]
+#[message(result = "Result<Addon>")]
 pub struct GetAddon(pub String);
 
 #[async_trait]
 impl Handler<GetAddon> for AddonManager {
-    async fn handle(
-        &mut self,
-        _ctx: &mut Context<Self>,
-        GetAddon(id): GetAddon,
-    ) -> Result<Addon, Error> {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, GetAddon(id): GetAddon) -> Result<Addon> {
         self.installed_addons
             .get(&id)
             .cloned()
@@ -305,21 +301,17 @@ impl Handler<GetAddon> for AddonManager {
     }
 }
 
-#[message(result = "Result<bool, Error>")]
+#[message(result = "Result<bool>")]
 pub struct HasAddon(pub String);
 
 #[async_trait]
 impl Handler<HasAddon> for AddonManager {
-    async fn handle(
-        &mut self,
-        _ctx: &mut Context<Self>,
-        HasAddon(id): HasAddon,
-    ) -> Result<bool, Error> {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, HasAddon(id): HasAddon) -> Result<bool> {
         Ok(self.installed_addons.contains_key(&id))
     }
 }
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct UninstallAddon(pub String);
 
 #[async_trait]
@@ -328,7 +320,7 @@ impl Handler<UninstallAddon> for AddonManager {
         &mut self,
         _ctx: &mut Context<Self>,
         UninstallAddon(addon_id): UninstallAddon,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if let Err(err) = self.unload_addon(addon_id.to_owned()).await {
             error!("Failed to unload {} properly: {:?}", addon_id, err);
         }
@@ -344,7 +336,7 @@ impl Handler<UninstallAddon> for AddonManager {
     }
 }
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct InstallAddonFromUrl(pub String, pub String, pub String, pub bool);
 
 #[async_trait]
@@ -353,7 +345,7 @@ impl Handler<InstallAddonFromUrl> for AddonManager {
         &mut self,
         _ctx: &mut Context<Self>,
         InstallAddonFromUrl(id, url, checksum, enable): InstallAddonFromUrl,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let temp_dir = TempDir::new(&id)?;
         let dest_path = temp_dir.path().join(format!("{}.tar.gz", id));
 

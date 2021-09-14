@@ -8,7 +8,7 @@ use crate::{
     macros::send,
     user_config,
 };
-use anyhow::{anyhow, bail, Context as AnyhowContext, Error};
+use anyhow::{anyhow, bail, Context as AnyhowContext, Result};
 use async_process::Command;
 use futures::{
     future::{AbortHandle, Abortable},
@@ -44,7 +44,7 @@ impl Actor for ProcessManager {}
 
 impl Service for ProcessManager {}
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct StartAddon(pub String, pub PathBuf, pub String);
 
 #[async_trait]
@@ -53,7 +53,7 @@ impl Handler<StartAddon> for ProcessManager {
         &mut self,
         _ctx: &mut Context<Self>,
         StartAddon(id, path, exec): StartAddon,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         if self.processes.contains_key(&id) {
             bail!("Process for {} already running", id)
         }
@@ -111,16 +111,12 @@ impl Handler<StartAddon> for ProcessManager {
     }
 }
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 pub struct StopAddon(pub String);
 
 #[async_trait]
 impl Handler<StopAddon> for ProcessManager {
-    async fn handle(
-        &mut self,
-        _ctx: &mut Context<Self>,
-        StopAddon(id): StopAddon,
-    ) -> Result<(), Error> {
+    async fn handle(&mut self, _ctx: &mut Context<Self>, StopAddon(id): StopAddon) -> Result<()> {
         let abort_handle = self
             .processes
             .remove(&id)

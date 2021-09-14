@@ -7,7 +7,7 @@ use crate::{
     addon_instance::{AddonInstance, Msg},
     config::CONFIG,
 };
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, Result};
 use futures::StreamExt;
 use log::{debug, info};
 use std::net::SocketAddr;
@@ -48,7 +48,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
     }
 }
 
-pub async fn start() -> Result<(), Error> {
+pub async fn start() -> Result<()> {
     info!("Starting addon socket");
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", CONFIG.ports.ipc)).await?;

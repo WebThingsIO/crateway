@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use crate::{config::CONFIG, macros::call};
-use anyhow::Error;
+use anyhow::Result;
 use futures::StreamExt;
 use futures::{stream::SplitSink, SinkExt};
 use log::{debug, info};
@@ -74,7 +74,7 @@ impl Handler<ThingsMessage> for ThingsSocket {
     }
 }
 
-#[message(result = "Result<(), Error>")]
+#[message(result = "Result<()>")]
 struct RegisterSink(SplitSink<WebSocketStream<TcpStream>, tokio_tungstenite::tungstenite::Message>);
 
 #[async_trait]
@@ -83,7 +83,7 @@ impl Handler<RegisterSink> for ThingsSocket {
         &mut self,
         _: &mut Context<Self>,
         RegisterSink(sink): RegisterSink,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         self.sinks.push(sink);
 
         Ok(())
@@ -113,7 +113,7 @@ async fn handle_connection(stream: TcpStream, addr: SocketAddr) {
     }
 }
 
-pub async fn start() -> Result<(), Error> {
+pub async fn start() -> Result<()> {
     info!("Starting things websocket");
 
     let listener = TcpListener::bind(format!("127.0.0.1:{}", CONFIG.ports.websocket)).await?;
