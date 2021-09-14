@@ -439,14 +439,15 @@ mod tests {
     extern crate two_rusty_forks;
     use super::*;
     use crate::{macros::call, tests_common::setup};
+    use serde_json::json;
     use two_rusty_forks::test_fork;
 
     #[async_test]
     #[test_fork]
     async fn test_create_things() {
         let _ = setup();
-        call!(Db.CreateThing("test1".to_owned(), serde_json::json!({}))).unwrap();
-        call!(Db.CreateThing("test2".to_owned(), serde_json::json!({}))).unwrap();
+        call!(Db.CreateThing("test1".to_owned(), json!({}))).unwrap();
+        call!(Db.CreateThing("test2".to_owned(), json!({}))).unwrap();
         let things = call!(Db.GetThings).unwrap();
         assert_eq!(things.len(), 2);
         assert_eq!(
@@ -467,7 +468,7 @@ mod tests {
     #[test_fork]
     async fn test_get_thing() {
         let _ = setup();
-        call!(Db.CreateThing("test".to_owned(), serde_json::json!({}))).unwrap();
+        call!(Db.CreateThing("test".to_owned(), json!({}))).unwrap();
         let thing = call!(Db.GetThing("test".to_owned())).unwrap();
         assert_eq!(
             thing,
@@ -664,5 +665,67 @@ mod tests {
         call!(Db.DeleteUser(user1.id)).unwrap();
         assert_eq!(call!(Db.GetJwtsByUser(user1.id)).unwrap().len(), 0);
         assert_eq!(call!(Db.GetJwtsByUser(user2.id)).unwrap().len(), 1);
+    }
+
+    #[async_test]
+    #[test_fork]
+    async fn test_set_setting() {
+        let _ = setup();
+        call!(Db.SetSetting("foo".to_owned(), "bar")).unwrap();
+        call!(Db.SetSetting("more".to_owned(), 42)).unwrap();
+        call!(Db.SetSetting("another".to_owned(), true)).unwrap();
+        call!(Db.SetSetting("last".to_owned(), json!({"foo": "bar"}))).unwrap();
+        assert_eq!(
+            call!(Db.GetSetting("foo".to_owned(), PhantomData::<String>)).unwrap(),
+            "bar"
+        );
+        assert_eq!(
+            call!(Db.GetSetting("more".to_owned(), PhantomData::<i64>)).unwrap(),
+            42
+        );
+        assert_eq!(
+            call!(Db.GetSetting("another".to_owned(), PhantomData::<bool>)).unwrap(),
+            true
+        );
+        assert_eq!(
+            call!(Db.GetSetting("last".to_owned(), PhantomData::<serde_json::Value>)).unwrap(),
+            json!({"foo": "bar"})
+        );
+    }
+
+    #[async_test]
+    #[test_fork]
+    async fn test_set_setting_overwrite() {
+        let _ = setup();
+        call!(Db.SetSetting("foo".to_owned(), "bar")).unwrap();
+        call!(Db.SetSetting("foo".to_owned(), "stuff")).unwrap();
+        assert_eq!(
+            call!(Db.GetSetting("foo".to_owned(), PhantomData::<String>)).unwrap(),
+            "stuff"
+        );
+    }
+
+    #[async_test]
+    #[test_fork]
+    async fn test_get_setting_wrong_datatype() {
+        let _ = setup();
+        call!(Db.SetSetting("foo".to_owned(), "bar")).unwrap();
+        assert!(call!(Db.GetSetting("foo".to_owned(), PhantomData::<i64>)).is_err());
+    }
+
+    #[async_test]
+    #[test_fork]
+    async fn test_set_setting_if_not_exists() {
+        let _ = setup();
+        call!(Db.SetSettingIfNotExists("foo".to_owned(), "bar")).unwrap();
+        assert_eq!(
+            call!(Db.GetSetting("foo".to_owned(), PhantomData::<String>)).unwrap(),
+            "bar"
+        );
+        call!(Db.SetSettingIfNotExists("foo".to_owned(), "buzz")).unwrap();
+        assert_eq!(
+            call!(Db.GetSetting("foo".to_owned(), PhantomData::<String>)).unwrap(),
+            "bar"
+        );
     }
 }
