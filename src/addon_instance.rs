@@ -5,6 +5,7 @@
 
 use crate::addon_manager::AddonManager;
 use crate::macros::send;
+use crate::user_config;
 use crate::{adapter::Adapter, addon_manager::AddonStarted};
 use anyhow::{anyhow, Result};
 use futures::{stream::SplitSink, SinkExt};
@@ -65,13 +66,13 @@ impl Handler<Msg> for AddonInstance {
                         },
                     },
                     user_profile: UserProfile {
-                        addons_dir: "".to_owned(),
-                        base_dir: "".to_owned(),
-                        config_dir: "".to_owned(),
-                        data_dir: "".to_owned(),
-                        gateway_dir: "".to_owned(),
-                        log_dir: "".to_owned(),
-                        media_dir: "".to_owned(),
+                        addons_dir: user_config::ADDONS_DIR.to_str().unwrap_or("").to_owned(),
+                        base_dir: user_config::BASE_DIR.to_str().unwrap_or("").to_owned(),
+                        config_dir: user_config::CONFIG_DIR.to_str().unwrap_or("").to_owned(),
+                        data_dir: user_config::DATA_DIR.to_str().unwrap_or("").to_owned(),
+                        gateway_dir: user_config::BASE_DIR.to_str().unwrap_or("").to_owned(),
+                        log_dir: user_config::LOG_DIR.to_str().unwrap_or("").to_owned(),
+                        media_dir: user_config::MEDIA_DIR.to_str().unwrap_or("").to_owned(),
                     },
                 }
                 .into();
