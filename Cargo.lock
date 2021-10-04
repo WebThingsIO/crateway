@@ -1696,7 +1696,7 @@ dependencies = [
 [[package]]
 name = "rust-manifest-types"
 version = "0.1.0-alpha.1"
-source = "git+https://github.com/WebThingsIO/rust-manifest-types.git?rev=f5fc0ed#f5fc0ed267b28e31ba8d3ba91154d765e5c1cc28"
+source = "git+https://github.com/WebThingsIO/manifest-types-rust.git?rev=f5fc0ed#f5fc0ed267b28e31ba8d3ba91154d765e5c1cc28"
 dependencies = [
  "jsonschema_code_generator",
  "os_pipe",
