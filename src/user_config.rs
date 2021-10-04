@@ -29,4 +29,19 @@ lazy_static! {
         DIR_BUILDER.create(&path).unwrap();
         path
     };
+    pub static ref DATA_DIR: PathBuf = {
+        let path = BASE_DIR.join("data");
+        DIR_BUILDER.create(&path).unwrap();
+        path
+    };
+    pub static ref LOG_DIR: PathBuf = {
+        let path = BASE_DIR.join("log");
+        DIR_BUILDER.create(&path).unwrap();
+        path
+    };
+    pub static ref MEDIA_DIR: PathBuf = {
+        let path = BASE_DIR.join("media");
+        DIR_BUILDER.create(&path).unwrap();
+        path
+    };
 }
