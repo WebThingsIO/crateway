@@ -5,7 +5,7 @@
 
 use crate::{
     addon::Addon,
-    addon_instance::AddonInstance,
+    addon_instance::{self, AddonInstance},
     db::{Db, GetSetting, SetSetting, SetSettingIfNotExists},
     macros::call,
     process_manager::{ProcessManager, StartAddon, StopAddon},
@@ -27,6 +27,7 @@ use std::{
 };
 use tar::Archive;
 use tempdir::TempDir;
+use webthings_gateway_ipc_types::Device as DeviceDescription;
 use xactor::{message, Actor, Addr, Context, Handler, Service};
 
 #[derive(Default)]
@@ -362,5 +363,29 @@ impl Handler<InstallAddonFromUrl> for AddonManager {
         }
         self.install_addon(id, dest_path, enable).await?;
         Ok(())
+    }
+}
+
+#[message(result = "Result<HashMap<String, DeviceDescription>>")]
+pub struct GetDevices;
+
+#[async_trait]
+impl Handler<GetDevices> for AddonManager {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        _msg: GetDevices,
+    ) -> Result<HashMap<String, DeviceDescription>> {
+        let mut devices = HashMap::new();
+        for (_, instance) in &self.running_addons {
+            devices.extend(
+                instance
+                    .call(addon_instance::GetDevices)
+                    .await
+                    .map_err(|err| anyhow!(err))
+                    .flatten()?,
+            );
+        }
+        Ok(devices)
     }
 }
