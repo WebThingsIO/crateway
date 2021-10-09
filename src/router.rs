@@ -6,6 +6,7 @@
 pub(crate) mod addons_router;
 pub(crate) mod extensions_router;
 pub(crate) mod login_router;
+pub(crate) mod new_things_router;
 pub(crate) mod ping_router;
 pub(crate) mod settings_router;
 pub(crate) mod things_router;
@@ -22,7 +23,8 @@ pub fn mount(rocket: Rocket<Build>) -> Rocket<Build> {
         .mount("/ping/", ping_router::routes())
         .mount("/settings/", settings_router::routes())
         .mount("/things/", things_router::routes())
-        .mount("/users/", users_router::routes());
+        .mount("/users/", users_router::routes())
+        .mount("/new_things/", new_things_router::routes());
     #[cfg(feature = "debug")]
     {
         rocket = rocket.mount("/", routes![exit]);

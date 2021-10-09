@@ -10,7 +10,7 @@ use rocket::serde::json::Value;
 use webthings_gateway_ipc_types::{Device as DeviceDescription, Property};
 
 pub struct Device {
-    description: DeviceDescription,
+    pub description: DeviceDescription,
     connected: bool,
 }
 

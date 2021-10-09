@@ -14,7 +14,8 @@ use std::collections::HashMap;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use webthings_gateway_ipc_types::{
-    Message, MessageBase, PluginRegisterResponseMessageData, Preferences, Units, UserProfile,
+    Device as DeviceDescription, Message, MessageBase, PluginRegisterResponseMessageData,
+    Preferences, Units, UserProfile,
 };
 use xactor::{message, Actor, Context, Handler};
 
@@ -110,5 +111,23 @@ impl Handler<Msg> for AddonInstance {
         };
 
         Ok(())
+    }
+}
+
+#[message(result = "Result<HashMap<String, DeviceDescription>>")]
+pub struct GetDevices;
+
+#[async_trait]
+impl Handler<GetDevices> for AddonInstance {
+    async fn handle(
+        &mut self,
+        _ctx: &mut Context<Self>,
+        _msg: GetDevices,
+    ) -> Result<HashMap<String, DeviceDescription>> {
+        let mut devices = HashMap::new();
+        for adapter in self.adapters.values() {
+            devices.extend(adapter.devices());
+        }
+        Ok(devices)
     }
 }

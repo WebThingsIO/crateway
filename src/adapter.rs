@@ -64,4 +64,11 @@ impl Adapter {
             .get_mut(device_id)
             .ok_or_else(|| anyhow!("Device {} does not exist in adapter {}", device_id, id))
     }
+
+    pub fn devices(&self) -> HashMap<String, DeviceDescription> {
+        self.devices
+            .iter()
+            .map(|(id, device)| (id.clone(), device.description.clone()))
+            .collect()
+    }
 }
