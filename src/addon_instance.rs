@@ -125,7 +125,7 @@ impl Handler<GetDevices> for AddonInstance {
         _msg: GetDevices,
     ) -> Result<HashMap<String, DeviceDescription>> {
         let mut devices = HashMap::new();
-        for (_, adapter) in &self.adapters {
+        for adapter in self.adapters.values() {
             devices.extend(adapter.devices());
         }
         Ok(devices)

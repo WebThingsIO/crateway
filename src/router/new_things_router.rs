@@ -58,7 +58,7 @@ impl DeviceDescriptionWithHref {
                             href: format!(
                                 "/things/{}/properties/{}",
                                 urlencoding::encode(&device_id).to_owned(),
-                                urlencoding::encode(&property_id).to_owned()
+                                urlencoding::encode(property_id).to_owned()
                             ),
                         },
                     )

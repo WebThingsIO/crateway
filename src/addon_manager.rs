@@ -377,7 +377,7 @@ impl Handler<GetDevices> for AddonManager {
         _msg: GetDevices,
     ) -> Result<HashMap<String, DeviceDescription>> {
         let mut devices = HashMap::new();
-        for (_, instance) in &self.running_addons {
+        for instance in self.running_addons.values() {
             devices.extend(
                 instance
                     .call(addon_instance::GetDevices)
