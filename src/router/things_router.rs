@@ -47,14 +47,14 @@ async fn post_things(
     if t.is_some() {
         Err(status::Custom(
             Status::BadRequest,
-            format!("Thing already added"),
+            "Thing already added".to_owned(),
         ))
     } else {
         let t = call!(Db.CreateThing(device))
             .to_rocket("Error saving new thing", Status::InternalServerError)?;
         info!(
             "Successfully created new thing {}",
-            t.title.clone().unwrap_or("".to_owned())
+            t.title.clone().unwrap_or_else(|| "".to_owned())
         );
         Ok(status::Created::new("").body(Json(t)))
     }

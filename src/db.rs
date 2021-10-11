@@ -10,7 +10,7 @@ use crate::{
 use anyhow::{anyhow, Context as AnyhowContext, Result};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData, ops::Deref, str::FromStr};
-use webthings_gateway_ipc_types::{Device, DeviceWithoutId};
+use webthings_gateway_ipc_types::Device;
 use xactor::{message, Actor, Context, Handler, Message, Service};
 
 pub struct Db(Connection);
@@ -444,6 +444,7 @@ mod tests {
     use crate::{macros::call, model::IntoDevice, tests_common::setup};
     use serde_json::json;
     use two_rusty_forks::test_fork;
+    use webthings_gateway_ipc_types::DeviceWithoutId;
 
     #[async_test]
     #[test_fork]

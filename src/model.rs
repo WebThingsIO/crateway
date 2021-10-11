@@ -23,11 +23,11 @@ impl Deref for Thing {
     }
 }
 
-impl Into<ThingWithoutId> for Thing {
-    fn into(self) -> ThingWithoutId {
+impl From<Thing> for ThingWithoutId {
+    fn from(thing: Thing) -> Self {
         ThingWithoutId {
-            device: self.device.into_device_without_id(),
-            connected: self.connected,
+            device: thing.device.into_device_without_id(),
+            connected: thing.connected,
         }
     }
 }
