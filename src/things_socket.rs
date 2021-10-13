@@ -5,13 +5,11 @@
 
 use crate::{config::CONFIG, macros::call};
 use anyhow::Result;
-use futures::StreamExt;
-use futures::{stream::SplitSink, SinkExt};
+use futures::{stream::SplitSink, SinkExt, StreamExt};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{tungstenite, WebSocketStream};
 use xactor::{message, Actor, Context, Handler, Service};

@@ -10,8 +10,10 @@ use futures::StreamExt;
 use httparse::Request;
 use log::debug;
 use std::net::SocketAddr;
-use tokio::io::AsyncWriteExt;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    io::AsyncWriteExt,
+    net::{TcpListener, TcpStream},
+};
 use tokio_util::codec::Decoder;
 
 #[derive(Debug)]

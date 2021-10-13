@@ -2,8 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use crate::macros::send;
-use crate::things_socket::{PropertyStatusMessage, ThingsMessage, ThingsMessages, ThingsSocket};
+use crate::{
+    macros::send,
+    things_socket::{PropertyStatusMessage, ThingsMessage, ThingsMessages, ThingsSocket},
+};
 use anyhow::{anyhow, Result};
 use log::debug;
 use rocket::serde::json::Value;

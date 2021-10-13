@@ -3,10 +3,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::addon_manager::AddonManager;
-use crate::macros::send;
-use crate::user_config;
-use crate::{adapter::Adapter, addon_manager::AddonStarted};
+use crate::{
+    adapter::Adapter,
+    addon_manager::{AddonManager, AddonStarted},
+    macros::send,
+    user_config,
+};
 use anyhow::{anyhow, Result};
 use futures::{stream::SplitSink, SinkExt};
 use log::debug;
