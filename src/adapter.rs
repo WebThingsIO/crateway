@@ -2,9 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use crate::device::Device;
-use crate::macros::send;
-use crate::things_socket::{ConnectedMessage, ThingsMessage, ThingsMessages, ThingsSocket};
+use crate::{
+    device::Device,
+    macros::send,
+    things_socket::{ConnectedMessage, ThingsMessage, ThingsMessages, ThingsSocket},
+};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use webthings_gateway_ipc_types::{Device as DeviceDescription, Property as PropertyDescription};
