@@ -12,7 +12,8 @@ use anyhow::{anyhow, bail, Context as AnyhowContext, Result};
 use async_process::Command;
 use futures::{
     future::{AbortHandle, Abortable},
-    {io::BufReader, prelude::*},
+    io::BufReader,
+    prelude::*,
 };
 use log::{debug, error, info, log, Level};
 use std::{collections::HashMap, path::PathBuf, process::Stdio};
