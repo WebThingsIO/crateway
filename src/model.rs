@@ -5,19 +5,95 @@
 
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use std::ops::Deref;
+use webthings_gateway_ipc_types::{Device, DeviceWithoutId};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Thing {
-    pub id: String,
+    #[serde(flatten)]
+    pub device: Device,
+    pub connected: bool,
 }
 
-impl Thing {
-    pub fn from_id_and_json(id: &str, mut description: serde_json::Value) -> Result<Self> {
-        if let Value::Object(ref mut map) = description {
-            map.insert("id".to_owned(), Value::String(id.to_owned()));
+impl Deref for Thing {
+    type Target = Device;
+
+    fn deref(&self) -> &Self::Target {
+        &self.device
+    }
+}
+
+impl From<Thing> for ThingWithoutId {
+    fn from(thing: Thing) -> Self {
+        ThingWithoutId {
+            device: thing.device.into_device_without_id(),
+            connected: thing.connected,
         }
-        serde_json::from_value(description).context("Parse Thing")
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct ThingWithoutId {
+    #[serde(flatten)]
+    pub device: DeviceWithoutId,
+    pub connected: bool,
+}
+
+pub trait IntoThing {
+    fn into_thing(self, id: String) -> Thing;
+}
+
+impl IntoThing for ThingWithoutId {
+    fn into_thing(self, id: String) -> Thing {
+        Thing {
+            device: self.device.into_device(id),
+            connected: self.connected,
+        }
+    }
+}
+
+pub trait IntoDeviceWithoutId {
+    fn into_device_without_id(self) -> DeviceWithoutId;
+}
+
+impl IntoDeviceWithoutId for Device {
+    fn into_device_without_id(self) -> DeviceWithoutId {
+        DeviceWithoutId {
+            at_context: self.at_context,
+            at_type: self.at_type,
+            actions: self.actions,
+            base_href: self.base_href,
+            credentials_required: self.credentials_required,
+            description: self.description,
+            events: self.events,
+            links: self.links,
+            pin: self.pin,
+            properties: self.properties,
+            title: self.title,
+        }
+    }
+}
+
+pub trait IntoDevice {
+    fn into_device(self, id: String) -> Device;
+}
+
+impl IntoDevice for DeviceWithoutId {
+    fn into_device(self, id: String) -> Device {
+        Device {
+            at_context: self.at_context,
+            at_type: self.at_type,
+            actions: self.actions,
+            base_href: self.base_href,
+            credentials_required: self.credentials_required,
+            description: self.description,
+            events: self.events,
+            links: self.links,
+            pin: self.pin,
+            properties: self.properties,
+            title: self.title,
+            id,
+        }
     }
 }
 
