@@ -5,6 +5,11 @@
 [![codecov](https://codecov.io/gh/webthingsio/crateway/branch/master/graph/badge.svg)](https://codecov.io/gh/webthingsio/crateway)
 
 ## Getting started
-* ./setup-ui.sh
-* cargo run
+* [Install rustup](https://rustup.rs/)
+* `rustup default nightly`
+* Install dependencies:
+  * `sudo apt-get install libsqlite3-dev luarocks`
+  * `sudo luarocks install lsqlite3`
+* `./setup-ui.sh`
+* `cargo run`
 * open http://localhost:8000
