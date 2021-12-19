@@ -36,7 +36,7 @@ pub struct MockDevice {
 
 impl MockDevice {
     pub fn new(device_handle: DeviceHandle) -> Self {
-        Self {device_handle}
+        Self { device_handle }
     }
 }
 
