@@ -22,6 +22,7 @@ futures = "0.3.16"
 async-process = "1.1.0"
 anyhow = "1.0.42"
 tokio-tungstenite = "0.15.0"
+tungstenite = "0.14"
 futures-util = { version = "0.3.16", features = ["sink"] }
 xactor = { version = "0.7.11", features = ["runtime-tokio"], default-features = false }
 regex = "1.5.4"

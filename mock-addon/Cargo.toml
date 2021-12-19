@@ -1,0 +1,31 @@
+[package]
+name = "mock-addon"
+version = "1.0.0"
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+async-trait = "0.1"
+serde_json = "1.0"
+webthings-gateway-ipc-types = "1.0.0-alpha.2"
+as-any = "0.2.0"
+tungstenite = "0.14"
+tokio-tungstenite = "0.15"
+futures-util = { version = "0.3.16", features = ["sink"] }
+
+[dependencies.simple_logger]
+version = "1.13"
+default-features = false
+features = []
+
+[dependencies.tokio]
+version = "1.0"
+features = ["macros", "rt-multi-thread", "sync", "time"]
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dependencies.gateway-addon-rust]
+git = "https://github.com/WebThingsIO/gateway-addon-rust"
+branch = "message-proxy"

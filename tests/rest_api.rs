@@ -11,6 +11,8 @@ mod gateway;
 mod extensions;
 #[path = "rest_api/login.rs"]
 mod login;
+#[path = "rest_api/new_things.rs"]
+mod new_things;
 #[path = "rest_api/ping.rs"]
 mod ping;
 #[path = "rest_api/settings.rs"]
@@ -63,6 +65,7 @@ async fn test_protected_routes() {
         (Method::GET, "/settings/addonsInfo", json!({})),
         (Method::GET, "/things", json!({})),
         (Method::GET, "/things/a_thing", json!({})),
+        (Method::GET, "/new_things", json!({})),
         (Method::GET, "/users/info", json!({})),
         (Method::GET, "/users/a_user", json!({})),
         (

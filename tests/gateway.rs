@@ -1,15 +1,25 @@
 use async_process::{Child, Command, Stdio};
-use futures::{channel::mpsc, io::BufReader, AsyncBufReadExt, AsyncRead, StreamExt};
+use fs_extra::{copy_items, dir::CopyOptions};
+use futures::{
+    channel::mpsc, io::BufReader, stream::SplitSink, AsyncBufReadExt, AsyncRead, SinkExt, StreamExt,
+};
 use regex::Regex;
 use reqwest::{Client, Method, RequestBuilder, Response, StatusCode};
 use rocket::async_trait;
+use serde::Serialize;
 use serde_json::json;
-use std::{fs, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 use tempdir::TempDir;
+use tokio::{
+    net::TcpStream,
+    time::{sleep, Duration},
+};
+use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
 pub struct Dirs {
     home_dir: TempDir,
     ui_dir: PathBuf,
+    addons_dir: PathBuf,
 }
 
 impl Dirs {
@@ -43,10 +53,47 @@ impl Drop for Gateway {
 }
 
 impl Gateway {
+    pub async fn startup_with_mock_addon() -> (Self, MockAddonConnection) {
+        let dirs = create_dirs();
+        let mock_addon_source_dir = env::current_dir().unwrap().join("mock-addon");
+
+        println!("Building mock addon");
+        Command::new("cargo")
+            .arg("build")
+            .current_dir(mock_addon_source_dir.clone())
+            .stdout(Stdio::piped())
+            .status()
+            .await
+            .unwrap();
+
+        println!("Copying mock addon to {:?}", dirs.addons_dir);
+        copy_items(
+            &[mock_addon_source_dir],
+            dirs.addons_dir.clone(),
+            &CopyOptions::new(),
+        )
+        .unwrap();
+
+        println!("Starting gateway");
+        let child = start_gateway(&dirs).await;
+        let mut gateway = Self::from(child, dirs).await;
+
+        println!("Enabling mock addon");
+        gateway.authorize().await;
+        let _: (_, String) = gateway
+            .put("/addons/mock-addon", json!({"enabled": true}))
+            .await;
+
+        (gateway, MockAddonConnection::new().await)
+    }
+
     pub async fn startup() -> Self {
         let dirs = create_dirs();
-        let mut child = start_gateway(&dirs).await;
+        let child = start_gateway(&dirs).await;
+        Self::from(child, dirs).await
+    }
 
+    pub async fn from(mut child: Child, dirs: Dirs) -> Self {
         let (tx, mut rx) = mpsc::unbounded();
 
         let tx1 = tx.clone();
@@ -138,10 +185,19 @@ impl Gateway {
 
 fn create_dirs() -> Dirs {
     let home_dir = TempDir::new(".webthingsio").expect("Create home dir");
+
     let ui_dir = home_dir.path().join(".webthingsui");
     fs::create_dir(&ui_dir).expect("Create ui dir");
     fs::write(ui_dir.join("index.html"), "foo").expect("Create index.html");
-    Dirs { home_dir, ui_dir }
+
+    let addons_dir = home_dir.path().join("addons");
+    fs::create_dir(&addons_dir).expect("Create addons dir");
+
+    Dirs {
+        home_dir,
+        ui_dir,
+        addons_dir,
+    }
 }
 
 async fn start_gateway(dirs: &Dirs) -> Child {
@@ -239,5 +295,43 @@ impl GatewayRequest for RequestBuilder {
         } else {
             self
         }
+    }
+}
+
+#[derive(Serialize, Debug)]
+pub enum MockAddonMessage {
+    CreateMockDevice,
+}
+
+pub struct MockAddonConnection(
+    SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, tungstenite::Message>,
+);
+
+impl MockAddonConnection {
+    pub async fn new() -> Self {
+        loop {
+            sleep(Duration::from_millis(100)).await;
+            println!("Trying to connect to mock addon");
+            match connect_async("ws://localhost:9501").await {
+                Ok((socket, _)) => {
+                    let (sink, _) = socket.split();
+                    return Self(sink);
+                }
+                Err(err) => eprintln!("Error connecting to mock addon: {:?}", err),
+            }
+        }
+    }
+
+    pub async fn send(&mut self, msg: MockAddonMessage) {
+        self.0
+            .send(tungstenite::Message::Text(
+                serde_json::to_string(&msg).unwrap(),
+            ))
+            .await
+            .unwrap();
+    }
+
+    pub async fn create_mock_device(&mut self) {
+        self.send(MockAddonMessage::CreateMockDevice).await
     }
 }
