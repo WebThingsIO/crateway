@@ -29,8 +29,8 @@ lazy_static! {
                 if out.status.success() {
                     if let Some(version) = parse(format!(
                         "{} {}",
-                        String::from_utf8_lossy(&out.stdout).to_string(),
-                        String::from_utf8_lossy(&out.stderr).to_string(),
+                        String::from_utf8_lossy(&out.stdout),
+                        String::from_utf8_lossy(&out.stderr),
                     )) {
                         versions.insert(version);
                     }

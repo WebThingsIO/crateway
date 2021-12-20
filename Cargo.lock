@@ -393,6 +393,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tokio-util",
+ "tungstenite",
  "two-rusty-forks",
  "urlencoding",
  "uuid",

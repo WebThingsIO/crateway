@@ -1,0 +1,19 @@
+{
+  "manifest_version": 1,
+  "id": "mock-addon",
+  "name": "Mock Addon",
+  "short_name": "Mock Addon",
+  "version": "1.0.0",
+  "description": "Mock add-on for WebThings Gateway\n",
+  "homepage_url": "https://github.com/WebThingsIO/crateway#readme",
+  "license": "MPL-2.0",
+  "author": "WebThingsIO",
+  "gateway_specific_settings": {
+    "webthings": {
+      "exec": "{path}/target/debug/mock-addon {path}",
+      "strict_min_version": "1.0.0",
+      "strict_max_version": "*",
+      "primary_type": "adapter"
+    }
+  }
+}
