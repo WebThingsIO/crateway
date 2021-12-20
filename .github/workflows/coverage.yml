@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Generate code coverage
         run: |
-          cargo +nightly tarpaulin --follow-exec --features debug --ignore-tests --timeout 600 --out Xml
+          cargo +nightly tarpaulin --follow-exec --features debug --ignore-tests --timeout 1200 --out Xml
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1
         with:
