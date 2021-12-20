@@ -6,7 +6,7 @@ fn main() {
     let mock_addon_source_dir = env::current_dir().unwrap().join("mock-addon");
     Command::new("cargo")
         .args(&["build"])
-        .current_dir(mock_addon_source_dir.clone())
+        .current_dir(mock_addon_source_dir)
         .output()
         .unwrap();
 }
