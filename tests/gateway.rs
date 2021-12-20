@@ -57,15 +57,6 @@ impl Gateway {
         let dirs = create_dirs();
         let mock_addon_source_dir = env::current_dir().unwrap().join("mock-addon");
 
-        println!("Building mock addon");
-        Command::new("cargo")
-            .arg("build")
-            .current_dir(mock_addon_source_dir.clone())
-            .stdout(Stdio::piped())
-            .status()
-            .await
-            .unwrap();
-
         println!("Copying mock addon to {:?}", dirs.addons_dir);
         copy_items(
             &[mock_addon_source_dir],
@@ -205,7 +196,7 @@ async fn start_gateway(dirs: &Dirs) -> Child {
     {
         Command::new("cargo")
             .args(&["build", "--features", "debug"])
-            .status()
+            .output()
             .await
             .expect("Build gateway for debug");
     }
