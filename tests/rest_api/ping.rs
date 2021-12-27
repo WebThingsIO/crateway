@@ -1,6 +1,6 @@
-use test_utils::gateway::Gateway;
 use reqwest::StatusCode;
 use serial_test::serial;
+use test_utils::gateway::Gateway;
 
 #[tokio::test]
 #[serial]
