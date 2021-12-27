@@ -7,6 +7,7 @@
 mod adapter;
 mod control_socket;
 mod device;
+mod property;
 
 use crate::{adapter::MockAdapter, control_socket::ControlSocket};
 use gateway_addon_rust::{api_error::ApiError, plugin::connect};
