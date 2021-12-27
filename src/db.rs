@@ -721,10 +721,7 @@ mod tests {
             call!(Db.GetSetting("more".to_owned(), PhantomData::<i64>)).unwrap(),
             42
         );
-        assert_eq!(
-            call!(Db.GetSetting("another".to_owned(), PhantomData::<bool>)).unwrap(),
-            true
-        );
+        assert!(call!(Db.GetSetting("another".to_owned(), PhantomData::<bool>)).unwrap());
         assert_eq!(
             call!(Db.GetSetting("last".to_owned(), PhantomData::<serde_json::Value>)).unwrap(),
             json!({"foo": "bar"})
