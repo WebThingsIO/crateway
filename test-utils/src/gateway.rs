@@ -5,7 +5,7 @@ use futures::{
 };
 use regex::Regex;
 use reqwest::{Client, Method, RequestBuilder, Response, StatusCode};
-use rocket::async_trait;
+use async_trait::async_trait;
 use serde::Serialize;
 use serde_json::json;
 use std::{env, fs, path::PathBuf};

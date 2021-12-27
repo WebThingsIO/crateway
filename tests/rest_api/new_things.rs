@@ -1,4 +1,4 @@
-use crate::{
+use test_utils::{
     gateway::Gateway,
     mock_thing::{self, DeviceExt},
 };

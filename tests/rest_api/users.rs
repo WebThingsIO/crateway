@@ -1,4 +1,4 @@
-use crate::gateway::Gateway;
+use test_utils::gateway::Gateway;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
 use serial_test::serial;
