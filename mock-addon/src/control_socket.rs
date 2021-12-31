@@ -21,7 +21,7 @@ pub struct ControlSocket {
 
 #[derive(Deserialize, Debug)]
 enum Message {
-    CreateMockDevice,
+    CreateMockDevice(webthings_gateway_ipc_types::Device),
 }
 
 async fn handle_connection(
@@ -49,12 +49,12 @@ async fn handle_connection(
 
 async fn handle_message(adapter: Arc<Mutex<Box<dyn Adapter>>>, msg: Message) {
     match msg {
-        Message::CreateMockDevice => {
+        Message::CreateMockDevice(description) => {
             adapter
                 .lock()
                 .await
                 .adapter_handle_mut()
-                .add_device(MockDeviceBuilder::new())
+                .add_device(MockDeviceBuilder::new(description))
                 .await
                 .unwrap();
         }

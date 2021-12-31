@@ -291,7 +291,7 @@ impl GatewayRequest for RequestBuilder {
 
 #[derive(Serialize, Debug)]
 pub enum MockAddonMessage {
-    CreateMockDevice,
+    CreateMockDevice(webthings_gateway_ipc_types::Device),
 }
 
 pub struct MockAddonConnection(
@@ -322,7 +322,8 @@ impl MockAddonConnection {
             .unwrap();
     }
 
-    pub async fn create_mock_device(&mut self) {
-        self.send(MockAddonMessage::CreateMockDevice).await
+    pub async fn create_mock_device(&mut self, description: webthings_gateway_ipc_types::Device) {
+        self.send(MockAddonMessage::CreateMockDevice(description))
+            .await
     }
 }

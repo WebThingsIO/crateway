@@ -4,13 +4,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.*
  */
 
-use gateway_addon_rust::{Device, DeviceBuilder, DeviceDescription, DeviceHandle};
+use crate::property::MockPropertyBuilder;
+use gateway_addon_rust::{Device, DeviceBuilder, DeviceDescription, DeviceHandle, Properties};
 
-pub struct MockDeviceBuilder;
+pub struct MockDeviceBuilder(webthings_gateway_ipc_types::Device);
 
 impl MockDeviceBuilder {
-    pub fn new() -> Self {
-        Self
+    pub fn new(description: webthings_gateway_ipc_types::Device) -> Self {
+        Self(description)
     }
 }
 
@@ -18,11 +19,32 @@ impl DeviceBuilder for MockDeviceBuilder {
     type Device = MockDevice;
 
     fn id(&self) -> String {
-        "mock-device".to_owned()
+        self.0.id.clone()
     }
 
     fn description(&self) -> DeviceDescription {
-        DeviceDescription::default()
+        let mut description = DeviceDescription::default();
+        description.at_context = self.0.at_context.clone();
+        description.base_href = self.0.base_href.clone();
+        description.credentials_required = self.0.credentials_required;
+        description.description = self.0.description.clone();
+        description.links = self.0.links.clone();
+        description.pin = self.0.pin.clone();
+        description.title = self.0.title.clone();
+        description
+    }
+
+    fn properties(&self) -> Properties {
+        let mut properties: Properties = Vec::new();
+        if let Some(property_descriptions) = &self.0.properties {
+            for (name, description) in property_descriptions {
+                properties.push(Box::new(MockPropertyBuilder::new(
+                    name.clone(),
+                    description.clone(),
+                )))
+            }
+        }
+        properties
     }
 
     fn build(self, device_handle: DeviceHandle) -> Self::Device {
@@ -30,18 +52,16 @@ impl DeviceBuilder for MockDeviceBuilder {
     }
 }
 
-pub struct MockDevice {
-    device_handle: DeviceHandle,
-}
+pub struct MockDevice(DeviceHandle);
 
 impl MockDevice {
     pub fn new(device_handle: DeviceHandle) -> Self {
-        Self { device_handle }
+        Self(device_handle)
     }
 }
 
 impl Device for MockDevice {
     fn device_handle_mut(&mut self) -> &mut DeviceHandle {
-        &mut self.device_handle
+        &mut self.0
     }
 }
