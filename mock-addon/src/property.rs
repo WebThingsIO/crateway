@@ -8,7 +8,6 @@ use gateway_addon_rust::{
     type_::Type, Property, PropertyBuilder, PropertyDescription, PropertyHandle,
 };
 use serde_json::json;
-use std::marker::PhantomData;
 
 pub struct MockPropertyBuilder(webthings_gateway_ipc_types::Property);
 
@@ -47,7 +46,7 @@ impl PropertyBuilder for MockPropertyBuilder {
             _ => panic!("Invalid type"),
         };
         description.unit = self.0.unit.clone();
-        description.value = self.0.value.clone().unwrap_or_else(|| json!(null));
+        description.value = self.0.value.clone().unwrap_or(json!(null));
         description.visible = self.0.visible;
         description
     }

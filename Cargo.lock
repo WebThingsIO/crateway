@@ -2154,7 +2154,6 @@ version = "1.0.0"
 dependencies = [
  "async-process",
  "async-trait",
- "fs_extra",
  "futures",
  "regex",
  "reqwest",

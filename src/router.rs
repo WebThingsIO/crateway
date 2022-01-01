@@ -25,14 +25,14 @@ pub fn mount(rocket: Rocket<Build>) -> Rocket<Build> {
         .mount("/things/", things_router::routes())
         .mount("/users/", users_router::routes())
         .mount("/new_things/", new_things_router::routes());
-    #[cfg(feature = "debug")]
+    #[cfg(debug_assertions)]
     {
         rocket = rocket.mount("/", routes![exit]);
     }
     rocket
 }
 
-#[cfg(feature = "debug")]
+#[cfg(debug_assertions)]
 #[get("/exit")]
 fn exit() {
     std::process::exit(0)
