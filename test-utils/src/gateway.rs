@@ -1,11 +1,10 @@
 use async_process::{Child, Command, Stdio};
-use fs_extra::{copy_items, dir::CopyOptions};
+use async_trait::async_trait;
 use futures::{
     channel::mpsc, io::BufReader, stream::SplitSink, AsyncBufReadExt, AsyncRead, SinkExt, StreamExt,
 };
 use regex::Regex;
 use reqwest::{Client, Method, RequestBuilder, Response, StatusCode};
-use rocket::async_trait;
 use serde::Serialize;
 use serde_json::json;
 use std::{env, fs, path::PathBuf};
@@ -58,12 +57,12 @@ impl Gateway {
         let mock_addon_source_dir = env::current_dir().unwrap().join("mock-addon");
 
         println!("Copying mock addon to {:?}", dirs.addons_dir);
-        copy_items(
-            &[mock_addon_source_dir],
-            dirs.addons_dir.clone(),
-            &CopyOptions::new(),
-        )
-        .unwrap();
+        Command::new("bash")
+            .args(vec!["copy.sh", dirs.addons_dir.to_str().unwrap()])
+            .current_dir(mock_addon_source_dir)
+            .output()
+            .await
+            .unwrap();
 
         println!("Starting gateway");
         let child = start_gateway(&dirs).await;
@@ -192,14 +191,6 @@ fn create_dirs() -> Dirs {
 }
 
 async fn start_gateway(dirs: &Dirs) -> Child {
-    #[cfg(not(feature = "debug"))]
-    {
-        Command::new("cargo")
-            .args(&["build", "--features", "debug"])
-            .output()
-            .await
-            .expect("Build gateway for debug");
-    }
     Command::new("./target/debug/crateway")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

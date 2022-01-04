@@ -38,10 +38,8 @@ pub struct AddonManager {
 
 impl AddonManager {
     async fn load_addon(&mut self, path: PathBuf) -> Result<()> {
-        let file = fs::File::open(path.join("manifest.json")).context(anyhow!(
-            "Could not open manifest.json file in {:?} found",
-            path,
-        ))?;
+        let file = fs::File::open(path.join("manifest.json"))
+            .context(anyhow!("Could not open manifest.json file in {:?}", path,))?;
         let manifest: Manifest =
             serde_json::from_reader(file).context(anyhow!("Could not read manifest.json"))?;
 

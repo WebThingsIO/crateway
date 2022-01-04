@@ -55,6 +55,4 @@ rev = "f5fc0ed"
 two-rusty-forks = { version = "0.4.0", features = ["macro"] }
 serial_test = "0.5.1"
 strip-ansi-escapes = "0.1.1"
-
-[features]
-debug = []
+test-utils = { path = "test-utils" }

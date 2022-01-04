@@ -1,10 +1,10 @@
-use crate::{
-    gateway::Gateway,
-    mock_thing::{self, DeviceExt},
-};
 use reqwest::StatusCode;
 use serde_json::{json, Value};
 use serial_test::serial;
+use test_utils::{
+    gateway::Gateway,
+    mock_thing::{self, DeviceExt},
+};
 
 #[tokio::test]
 #[serial]

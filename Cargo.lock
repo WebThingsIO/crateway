@@ -116,9 +116,9 @@ checksum = "e91831deabf0d6d7ec49552e489aed63b7456a7a3c46cff62adad428110b0af0"
 
 [[package]]
 name = "async-trait"
-version = "0.1.50"
+version = "0.1.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b98e84bbb4cbcdd97da190ba0c58a1bb0de2c1fdf67d159e192ed766aeca722"
+checksum = "061a7acccaa286c011ddc30970520b98fa40e00c9d644633fb26b5fc63a265e3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -390,6 +390,7 @@ dependencies = [
  "strip-ansi-escapes",
  "tar",
  "tempdir",
+ "test-utils",
  "tokio",
  "tokio-tungstenite",
  "tokio-util",
@@ -2145,6 +2146,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dfed899f0eb03f32ee8c6a0aabdb8a7949659e3466561fc0adf54e26d88c5f4"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "test-utils"
+version = "1.0.0"
+dependencies = [
+ "async-process",
+ "async-trait",
+ "futures",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "strip-ansi-escapes",
+ "tempdir",
+ "tokio",
+ "tokio-tungstenite",
+ "tungstenite",
+ "webthings-gateway-ipc-types",
 ]
 
 [[package]]

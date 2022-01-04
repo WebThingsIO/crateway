@@ -10,7 +10,7 @@
   "author": "WebThingsIO",
   "gateway_specific_settings": {
     "webthings": {
-      "exec": "{path}/target/debug/mock-addon {path}",
+      "exec": "{path}/mock-addon {path}",
       "strict_min_version": "1.0.0",
       "strict_max_version": "*",
       "primary_type": "adapter"

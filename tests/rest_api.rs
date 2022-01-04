@@ -1,13 +1,9 @@
-use crate::gateway::{Gateway, GatewayRequest};
 use reqwest::{Method, RequestBuilder, StatusCode};
 use serde_json::json;
 use serial_test::serial;
+use test_utils::gateway::{Gateway, GatewayRequest};
 
 extern crate serial_test;
-#[path = "./gateway.rs"]
-mod gateway;
-#[path = "./mock_thing.rs"]
-mod mock_thing;
 
 #[path = "rest_api/extensions.rs"]
 mod extensions;
