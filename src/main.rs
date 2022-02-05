@@ -9,6 +9,10 @@
 extern crate rocket;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate diesel;
+#[macro_use]
+extern crate diesel_migrations;
 
 mod adapter;
 mod addon;
@@ -17,15 +21,18 @@ mod addon_manager;
 mod addon_socket;
 mod config;
 mod db;
+mod db2;
 mod device;
 mod jwt;
 mod macros;
 mod model;
+mod models;
 mod platform;
 mod process_manager;
 mod rest_api;
 mod reverse_proxy;
 mod router;
+mod schema;
 mod things_socket;
 mod user_config;
 
@@ -54,6 +61,9 @@ async fn main() {
         ColorChoice::Auto,
     )
     .unwrap();
+
+    // FIXME: We need to do this until db handling is fully moved to diesel
+    db2::CONNECTION.lock().await;
 
     info!("Starting gateway");
 
