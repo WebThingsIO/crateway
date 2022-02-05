@@ -22,9 +22,7 @@ pub struct ThingWithoutId {
 impl Thing {
     pub async fn find(thing_id: &str) -> Result<Option<Self>> {
         use crate::schema::things::dsl::*;
-        let mut result = things
-            .find(thing_id)
-            .load(&*crate::db2::CONNECTION.lock().await)?;
+        let mut result = things.find(thing_id).load(&*crate::db2::connection())?;
         match result.len() {
             0 => Ok(None),
             1 => Ok(Some(result.swap_remove(0))),
@@ -35,7 +33,7 @@ impl Thing {
     pub async fn all() -> Result<Vec<Self>> {
         use crate::schema::things::dsl::*;
         things
-            .load(&*crate::db2::CONNECTION.lock().await)
+            .load(&*crate::db2::connection())
             .map_err(|err| anyhow!(err))
     }
     pub async fn create(device: Device) -> Result<usize> {
@@ -44,7 +42,7 @@ impl Thing {
                 device,
                 connected: true,
             })
-            .execute(&*crate::db2::CONNECTION.lock().await)
+            .execute(&*crate::db2::connection())
             .map_err(|err| anyhow!(err))
     }
 }

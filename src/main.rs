@@ -13,6 +13,8 @@ extern crate lazy_static;
 extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
+#[macro_use]
+extern crate ref_thread_local;
 
 mod adapter;
 mod addon;
@@ -63,7 +65,7 @@ async fn main() {
     .unwrap();
 
     // FIXME: We need to do this until db handling is fully moved to diesel
-    db2::CONNECTION.lock().await;
+    db2::connection();
 
     info!("Starting gateway");
 
