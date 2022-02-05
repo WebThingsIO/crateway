@@ -55,9 +55,7 @@ async fn post_things(
             .to_rocket("Error saving new thing", Status::InternalServerError)?;
         if count == 1 {
             let t = Thing::find(&device_id)
-                .await
-                .map(|v| v.ok_or_else(|| anyhow!("Thing not found")))
-                .flatten()
+                .await.and_then(|v| v.ok_or_else(|| anyhow!("Thing not found")))
                 .to_rocket("Error during db.get_thing", Status::InternalServerError)?;
             info!(
                 "Successfully created new thing {}",

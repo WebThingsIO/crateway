@@ -139,7 +139,7 @@ async fn get_addon_license(
     addon_id: String,
     _jwt: JSONWebToken,
 ) -> Result<String, status::Custom<String>> {
-    let addon_dir = user_config::ADDONS_DIR.join(addon_id.to_owned());
+    let addon_dir = user_config::ADDONS_DIR.join(&addon_id);
     let entries = fs::read_dir(addon_dir).to_rocket(
         "Failed to obtain license: Failed to access addon directory",
         Status::InternalServerError,
@@ -164,7 +164,7 @@ async fn get_addon_license(
             "License not found".to_owned(),
         ));
     }
-    fs::read_to_string(files[0].to_owned()).to_rocket(
+    fs::read_to_string(&files[0]).to_rocket(
         format!("Failed to read license file for addon {}", addon_id),
         Status::InternalServerError,
     )

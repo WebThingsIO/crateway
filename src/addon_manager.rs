@@ -93,22 +93,22 @@ impl AddonManager {
             .parent()
             .ok_or_else(|| anyhow!("Missing parent directory"))?;
 
-        let file = File::open(package_path.to_owned()).map_err(|err| anyhow!(err))?;
+        let file = File::open(&package_path).map_err(|err| anyhow!(err))?;
         Archive::new(GzDecoder::new(file))
             .unpack(package_dir)
             .context("Failed to extract package")?;
 
         self.uninstall_addon(package_id.to_owned(), false).await?;
 
-        let addon_path = user_config::ADDONS_DIR.join(package_id.to_owned());
+        let addon_path = user_config::ADDONS_DIR.join(&package_id);
         let entries: Vec<PathBuf> = package_dir
             .join("package")
             .read_dir()?
             .filter_map(|entry| entry.ok())
             .map(|entry| entry.path())
             .collect();
-        fs::create_dir(addon_path.to_owned())?;
-        move_items(&entries, addon_path.to_owned(), &CopyOptions::new())
+        fs::create_dir(&addon_path)?;
+        move_items(&entries, &addon_path, &CopyOptions::new())
             .context("Failed to move package")?;
 
         let enabled_key = format!("addons.{}.enabled", package_id);
@@ -126,7 +126,7 @@ impl AddonManager {
             error!("Failed to unload {} properly: {:?}", package_id, err);
         }
 
-        let addon_path = user_config::ADDONS_DIR.join(package_id.to_owned());
+        let addon_path = user_config::ADDONS_DIR.join(&package_id);
         if addon_path.exists() && addon_path.is_dir() {
             fs::remove_dir_all(addon_path).context(format!("Error removing {}", package_id))?;
         }
@@ -323,7 +323,7 @@ impl Handler<UninstallAddon> for AddonManager {
         if let Err(err) = self.unload_addon(addon_id.to_owned()).await {
             error!("Failed to unload {} properly: {:?}", addon_id, err);
         }
-        let addon_path = user_config::ADDONS_DIR.join(addon_id.to_owned());
+        let addon_path = user_config::ADDONS_DIR.join(&addon_id);
         if addon_path.exists() && addon_path.is_dir() {
             fs::remove_dir_all(addon_path).context(format!("Error removing {}", addon_id))?;
         }
