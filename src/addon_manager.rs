@@ -108,8 +108,7 @@ impl AddonManager {
             .map(|entry| entry.path())
             .collect();
         fs::create_dir(&addon_path)?;
-        move_items(&entries, &addon_path, &CopyOptions::new())
-            .context("Failed to move package")?;
+        move_items(&entries, &addon_path, &CopyOptions::new()).context("Failed to move package")?;
 
         let enabled_key = format!("addons.{}.enabled", package_id);
         if enable {
