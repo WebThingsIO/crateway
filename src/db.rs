@@ -3,14 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use crate::{
-    model::{IntoThing, Thing, ThingWithoutId, User},
-    user_config,
-};
+use crate::{model::User, user_config};
 use anyhow::{anyhow, Context as AnyhowContext, Result};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::{collections::HashMap, fmt::Debug, marker::PhantomData, ops::Deref, str::FromStr};
-use webthings_gateway_ipc_types::Device;
+
 use xactor::{message, Actor, Context, Handler, Message, Service};
 
 pub struct Db(Connection);
@@ -25,86 +22,6 @@ impl Default for Db {
             .expect("Open database file");
         create_tables(&conn);
         Self(conn)
-    }
-}
-
-#[message(result = "Result<Vec<Thing>>")]
-pub struct GetThings;
-
-#[async_trait]
-impl Handler<GetThings> for Db {
-    async fn handle(&mut self, _ctx: &mut Context<Self>, _msg: GetThings) -> Result<Vec<Thing>> {
-        let mut stmt = self
-            .prepare("SELECT id, description FROM things")
-            .context("Prepare statement")?;
-        let mut rows = stmt.query([]).context("Execute query")?;
-        let mut things = Vec::new();
-        while let Some(row) = rows.next().context("Next row")? {
-            let id: String = row.get(0).context("Get parameter")?;
-            let description: String = row.get(1).context("Get parameter")?;
-            let description: ThingWithoutId =
-                serde_json::from_str(&description).context("Parse JSON description")?;
-            things.push(description.into_thing(id));
-        }
-        Ok(things)
-    }
-}
-
-#[message(result = "Result<Option<Thing>>")]
-pub struct GetThing(pub String);
-
-#[async_trait]
-impl Handler<GetThing> for Db {
-    async fn handle(
-        &mut self,
-        _ctx: &mut Context<Self>,
-        GetThing(id): GetThing,
-    ) -> Result<Option<Thing>> {
-        let mut stmt = self
-            .prepare("SELECT id, description FROM things WHERE id = ?")
-            .context("Prepare statement")?;
-        let row = stmt
-            .query_row(params![id], |row| {
-                let id: String = row.get(0)?;
-                let description: String = row.get(1)?;
-                Ok((id, description))
-            })
-            .optional()
-            .context("Query database")?;
-
-        match row {
-            None => Ok(None),
-            Some(entry) => {
-                let id = entry.0;
-                let description: ThingWithoutId =
-                    serde_json::from_str(&entry.1).context("Parse JSON description")?;
-                Ok(Some(description.into_thing(id)))
-            }
-        }
-    }
-}
-
-#[message(result = "Result<Thing>")]
-pub struct CreateThing(pub Device);
-
-#[async_trait]
-impl Handler<CreateThing> for Db {
-    async fn handle(
-        &mut self,
-        _ctx: &mut Context<Self>,
-        CreateThing(description): CreateThing,
-    ) -> Result<Thing> {
-        let thing = Thing {
-            device: description,
-            connected: true,
-        };
-        let description = serde_json::to_string(&thing).context("Stringify thing")?;
-        self.execute(
-            "INSERT INTO things (id, description) VALUES (?, ?)",
-            params![thing.id, description],
-        )
-        .context("Insert into database")?;
-        Ok(thing)
     }
 }
 
@@ -441,80 +358,9 @@ fn create_tables(conn: &Connection) {
 mod tests {
     extern crate two_rusty_forks;
     use super::*;
-    use crate::{macros::call, model::IntoDevice, tests_common::setup};
+    use crate::{macros::call, tests_common::setup};
     use serde_json::json;
     use two_rusty_forks::test_fork;
-    use webthings_gateway_ipc_types::DeviceWithoutId;
-
-    #[async_test]
-    #[test_fork]
-    async fn test_create_things() {
-        let _ = setup();
-        let description = DeviceWithoutId {
-            at_context: None,
-            at_type: None,
-            actions: None,
-            base_href: None,
-            credentials_required: None,
-            description: None,
-            events: None,
-            links: None,
-            pin: None,
-            properties: None,
-            title: None,
-        };
-        call!(Db.CreateThing(description.clone().into_device("test1".to_owned()))).unwrap();
-        call!(Db.CreateThing(description.clone().into_device("test2".to_owned()))).unwrap();
-        let things = call!(Db.GetThings).unwrap();
-        assert_eq!(things.len(), 2);
-        assert_eq!(
-            things[0],
-            ThingWithoutId {
-                device: description.clone(),
-                connected: true
-            }
-            .into_thing("test1".to_owned())
-        );
-        assert_eq!(
-            things[1],
-            ThingWithoutId {
-                device: description,
-                connected: true
-            }
-            .into_thing("test2".to_owned())
-        );
-    }
-
-    #[async_test]
-    #[test_fork]
-    async fn test_get_thing() {
-        let _ = setup();
-        let description = DeviceWithoutId {
-            at_context: None,
-            at_type: None,
-            actions: None,
-            base_href: None,
-            credentials_required: None,
-            description: None,
-            events: None,
-            links: None,
-            pin: None,
-            properties: None,
-            title: None,
-        };
-        call!(Db.CreateThing(description.clone().into_device("test".to_owned()))).unwrap();
-        let thing = call!(Db.GetThing("test".to_owned())).unwrap();
-        assert_eq!(
-            thing,
-            Some(
-                ThingWithoutId {
-                    device: description,
-                    connected: true,
-                }
-                .into_thing("test".to_owned())
-            )
-        );
-    }
 
     #[async_test]
     #[test_fork]

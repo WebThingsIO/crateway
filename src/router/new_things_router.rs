@@ -1,8 +1,8 @@
 use crate::{
     addon_manager::{AddonManager, GetDevices},
-    db::{Db, GetThings},
     jwt::JSONWebToken,
     macros::{call, ToRocket},
+    models::Thing,
 };
 use rocket::{http::Status, response::status, serde::json::Json, Route};
 use serde::{Serialize, Serializer};
@@ -77,7 +77,8 @@ impl DeviceDescriptionWithHref {
 async fn get_new_things(
     _jwt: JSONWebToken,
 ) -> Result<Json<Vec<DeviceDescriptionWithHref>>, status::Custom<String>> {
-    let stored_things = call!(Db.GetThings)
+    let stored_things = Thing::all()
+        .await
         .to_rocket("Failed to get stored things", Status::InternalServerError)?;
     let connected_devices = call!(AddonManager.GetDevices).to_rocket(
         "Failed to get connected things",
