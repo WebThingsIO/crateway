@@ -140,7 +140,7 @@ impl IntoDevice for DeviceWithoutId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{model::IntoDevice, tests_common::setup};
+    use crate::tests_common::setup;
     use two_rusty_forks::test_fork;
     use webthings_gateway_ipc_types::DeviceWithoutId;
 
